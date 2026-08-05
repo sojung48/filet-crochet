@@ -1,6 +1,6 @@
 import { Pattern, OPEN, FILLED, MAX_SIDE } from './pattern.js';
 import { draw, hitTest, canvasSize } from './renderer.js';
-import { buildReading, readingToHTML, readingToText } from './reading.js';
+import { buildReading, readingToHTML } from './reading.js';
 import { History } from './history.js';
 import {
   savePattern, loadPattern, saveView, loadView,
@@ -68,7 +68,6 @@ function syncControlsFromState() {
   $('opt-guides').checked = state.view.guides;
   $('opt-numbers').checked = state.view.numbers;
   $('opt-symbols').checked = state.view.symbols;
-  $('opt-boustrophedon').checked = state.view.boustrophedon;
   for (const btn of document.querySelectorAll('.tool')) {
     btn.setAttribute('aria-pressed', String(btn.dataset.tool === state.tool));
   }
@@ -119,7 +118,6 @@ function render() {
   $('btn-undo').disabled = !state.history.canUndo;
   $('btn-redo').disabled = !state.history.canRedo;
   updateStatus();
-  updateReading();
 }
 
 function updateStatus() {
@@ -129,11 +127,12 @@ function updateStatus() {
   $('status-count').textContent = `채움 ${filled} / ${p.cells.length}`;
 }
 
-let readingCache = null;
-
-function updateReading() {
-  readingCache = buildReading(state.pattern, { boustrophedon: state.view.boustrophedon });
-  $('reading').innerHTML = readingToHTML(readingCache);
+/**
+ * 행별 지시문. 화면에는 띄우지 않고 인쇄·복사할 때만 만든다.
+ * (인쇄물에 이미 들어가므로 패널에 상시 표시할 필요가 없다.)
+ */
+function currentReading() {
+  return buildReading(state.pattern, { boustrophedon: state.view.boustrophedon });
 }
 
 // ---------------------------------------------------------------- 도구
@@ -470,9 +469,6 @@ function bindPanel() {
   bindCheckbox('opt-guides', 'guides');
   bindCheckbox('opt-numbers', 'numbers');
   bindCheckbox('opt-symbols', 'symbols');
-  bindCheckbox('opt-boustrophedon', 'boustrophedon');
-
-  $('btn-copy-reading').addEventListener('click', copyReading);
 
   $('btn-export-json').addEventListener('click', () => {
     downloadJSON(state.pattern, timestampName('json'));
@@ -554,25 +550,6 @@ function losesFilledCells(p, cols, rows) {
   return false;
 }
 
-async function copyReading() {
-  const text = readingToText(readingCache ?? [], { boustrophedon: state.view.boustrophedon });
-  try {
-    await navigator.clipboard.writeText(text);
-    toast('지시문을 복사했습니다.');
-  } catch {
-    // 클립보드 권한이 없거나 http일 때
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    const ok = document.execCommand?.('copy');
-    ta.remove();
-    toast(ok ? '지시문을 복사했습니다.' : '복사에 실패했습니다.');
-  }
-}
-
 // ---------------------------------------------------------------- 내보내기
 
 /** 화면 배율과 무관하게 인쇄에 쓸 만한 해상도로 다시 그린다. */
@@ -612,7 +589,7 @@ function printPattern() {
   const p = state.pattern;
   $('print-title').textContent = `방안 뜨기 도안 — ${p.cols} × ${p.rows}칸`;
   $('print-img').src = renderForExport().toDataURL('image/png');
-  $('print-reading').innerHTML = readingToHTML(readingCache ?? []);
+  $('print-reading').innerHTML = readingToHTML(currentReading());
 
   const img = $('print-img');
   if (img.complete) window.print();

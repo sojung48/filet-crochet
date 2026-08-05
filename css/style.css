@@ -260,27 +260,6 @@ input[type="number"] {
   font-size: 12px;
 }
 
-.reading {
-  margin-top: 8px;
-  max-height: 320px;
-  overflow-y: auto;
-  font-size: 12.5px;
-  line-height: 1.7;
-  font-variant-numeric: tabular-nums;
-}
-.reading .row-line {
-  padding: 2px 0;
-  border-bottom: 1px dotted var(--line);
-  white-space: normal;
-}
-.reading .row-no {
-  display: inline-block;
-  min-width: 44px;
-  color: var(--accent);
-  font-weight: 600;
-}
-.reading .empty { color: var(--muted); }
-
 /* ---------- toast ---------- */
 
 .toast {
