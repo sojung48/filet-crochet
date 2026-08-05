@@ -42,6 +42,10 @@ https://sojung48.github.io/filet-crochet/
   다른 시점 것이 되면 새 화면에 옛 동작이 섞인다. 빌드가 번들 내용의 해시를
   `bundle.js?v=...`로 붙여 막고 있다.
 - 로컬 저장은 **기기마다 따로**다. 폰↔PC 이동은 JSON으로 해야 한다.
+- **iOS 홈 화면 아이콘은 SVG를 못 읽는다.** `apple-touch-icon`에 SVG를 걸면
+  아이콘 대신 페이지를 캡처한 그림이 들어간다. 그래서 `icon-180.png`를
+  따로 둔다. 아이콘 그림을 고치려면 `icon.svg`와 `make-icon.mjs`를 함께
+  고친 뒤 `node make-icon.mjs icon-180.png`를 실행한다.
 
 ## 2단계 (나중에)
 
