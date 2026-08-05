@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<!-- 핀치는 앱이 직접 처리한다(격자 배율 변경). 브라우저 확대와 겹치면
+     둘이 동시에 걸려 어긋나므로 브라우저 쪽 확대는 끈다. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>필레 크로셰 도안 제작기</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <h1>필레 크로셰 도안</h1>
+  <div class="topbar-actions">
+    <button type="button" id="btn-undo" title="실행취소 (Ctrl+Z)" disabled>↶</button>
+    <button type="button" id="btn-redo" title="재실행 (Ctrl+Shift+Z)" disabled>↷</button>
+    <button type="button" id="btn-panel" class="only-mobile" title="메뉴">☰</button>
+  </div>
+</header>
+
+<div class="layout">
+
+  <main class="stage">
+    <div class="toolbar" role="toolbar" aria-label="도구">
+      <div class="tool-group" id="tools">
+        <button type="button" class="tool" data-tool="draw" aria-pressed="true" title="그리기 (B)">✏️<span>그리기</span></button>
+        <button type="button" class="tool" data-tool="erase" aria-pressed="false" title="지우기 (E)">🧽<span>지우기</span></button>
+        <button type="button" class="tool" data-tool="rect" aria-pressed="false" title="사각형 (R)">▭<span>사각형</span></button>
+        <button type="button" class="tool" data-tool="fill" aria-pressed="false" title="채우기 (G)">🪣<span>채우기</span></button>
+      </div>
+      <div class="tool-group zoom-group">
+        <button type="button" id="btn-zoom-out" title="축소 (−)">−</button>
+        <span id="zoom-label">100%</span>
+        <button type="button" id="btn-zoom-in" title="확대 (+)">+</button>
+        <button type="button" id="btn-zoom-fit" title="화면에 맞춤">맞춤</button>
+      </div>
+    </div>
+
+    <div class="canvas-wrap" id="canvas-wrap">
+      <canvas id="grid" aria-label="도안 격자"></canvas>
+    </div>
+
+    <div class="statusbar">
+      <span id="status-pos">–</span>
+      <span id="status-size">–</span>
+      <span id="status-count">–</span>
+    </div>
+  </main>
+
+  <aside class="panel" id="panel">
+    <section class="panel-section">
+      <h2>격자 크기</h2>
+      <div class="field-row">
+        <label>열 <input type="number" id="in-cols" min="1" max="300" value="30"></label>
+        <label>행 <input type="number" id="in-rows" min="1" max="300" value="30"></label>
+        <button type="button" id="btn-resize">적용</button>
+      </div>
+      <p class="hint">크기를 줄이면 바깥쪽 칸은 잘립니다. (실행취소 가능)</p>
+    </section>
+
+    <section class="panel-section">
+      <h2>보기</h2>
+      <label class="check"><input type="checkbox" id="opt-guides" checked> 10칸마다 굵은 안내선</label>
+      <label class="check"><input type="checkbox" id="opt-numbers" checked> 행/열 번호</label>
+      <label class="check"><input type="checkbox" id="opt-symbols"> 채운 칸에 기호(×) 표시</label>
+    </section>
+
+    <section class="panel-section">
+      <h2>도안 읽기</h2>
+      <div class="field-row">
+        <label class="check"><input type="checkbox" id="opt-boustrophedon" checked> 홀수행 ←, 짝수행 → (지그재그)</label>
+      </div>
+      <button type="button" id="btn-copy-reading" class="wide">지시문 복사</button>
+      <div id="reading" class="reading" aria-live="polite"></div>
+    </section>
+
+    <section class="panel-section">
+      <h2>저장 / 불러오기</h2>
+      <div class="field-row">
+        <button type="button" id="btn-save">로컬 저장</button>
+        <button type="button" id="btn-load">불러오기</button>
+      </div>
+      <div class="field-row">
+        <button type="button" id="btn-export-json">JSON 내보내기</button>
+        <button type="button" id="btn-import-json">JSON 가져오기</button>
+      </div>
+      <input type="file" id="file-json" accept="application/json,.json" hidden>
+      <p class="hint" id="save-hint">자동 저장됨: –</p>
+    </section>
+
+    <section class="panel-section">
+      <h2>내보내기</h2>
+      <div class="field-row">
+        <button type="button" id="btn-png">PNG 저장</button>
+        <button type="button" id="btn-print">인쇄</button>
+      </div>
+    </section>
+
+    <section class="panel-section">
+      <h2>편집</h2>
+      <div class="field-row">
+        <button type="button" id="btn-clear">전체 비우기</button>
+        <button type="button" id="btn-invert">반전</button>
+      </div>
+    </section>
+  </aside>
+
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<!-- 인쇄 전용 영역 -->
+<div class="print-only" id="print-area">
+  <h2 id="print-title">필레 크로셰 도안</h2>
+  <img id="print-img" alt="도안">
+  <div id="print-reading"></div>
+</div>
+
+<!-- 번들(일반 스크립트)이라 index.html을 그냥 더블클릭해도 동작한다.
+     원본은 js/*.js 이고, 수정 후에는 "node build.mjs"로 다시 만든다. -->
+<script defer src="js/bundle.js"></script>
+</body>
+</html>

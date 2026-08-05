@@ -1,0 +1,208 @@
+/**
+ * 도안 데이터 모델.
+ *
+ * 칸 값은 boolean이 아니라 팔레트 인덱스(0 = 비움, 1 = 채움)로 둔다.
+ * 2단계에서 다색 그래프 도안으로 확장할 때 저장 포맷을 그대로 쓰기 위함.
+ */
+
+export const OPEN = 0;
+export const FILLED = 1;
+
+/** 팔레트. 인덱스 순서가 곧 칸 값이다. */
+export const DEFAULT_PALETTE = [
+  { name: '비움', css: 'transparent' },
+  { name: '채움', css: 'var(--cell-filled)' },
+];
+
+export const MAX_SIDE = 300;
+
+export class Pattern {
+  constructor(cols = 30, rows = 30, palette = DEFAULT_PALETTE) {
+    this.cols = cols;
+    this.rows = rows;
+    this.palette = palette.map((p) => ({ ...p }));
+    this.cells = new Uint8Array(cols * rows);
+  }
+
+  index(x, y) {
+    return y * this.cols + x;
+  }
+
+  inBounds(x, y) {
+    return x >= 0 && y >= 0 && x < this.cols && y < this.rows;
+  }
+
+  get(x, y) {
+    return this.inBounds(x, y) ? this.cells[this.index(x, y)] : OPEN;
+  }
+
+  /** @returns {boolean} 값이 실제로 바뀌었는지 */
+  set(x, y, value) {
+    if (!this.inBounds(x, y)) return false;
+    const i = this.index(x, y);
+    if (this.cells[i] === value) return false;
+    this.cells[i] = value;
+    return true;
+  }
+
+  countOf(value) {
+    let n = 0;
+    for (let i = 0; i < this.cells.length; i++) if (this.cells[i] === value) n++;
+    return n;
+  }
+
+  clone() {
+    const p = new Pattern(this.cols, this.rows, this.palette);
+    p.cells.set(this.cells);
+    return p;
+  }
+
+  /** 크기 변경. 겹치는 영역은 좌상단 기준으로 유지하고 나머지는 잘라낸다. */
+  resized(cols, rows) {
+    const p = new Pattern(cols, rows, this.palette);
+    const w = Math.min(cols, this.cols);
+    const h = Math.min(rows, this.rows);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        p.cells[p.index(x, y)] = this.cells[this.index(x, y)];
+      }
+    }
+    return p;
+  }
+
+  /** 4방향 flood fill. @returns {boolean} 바뀐 칸이 있었는지 */
+  floodFill(sx, sy, value) {
+    if (!this.inBounds(sx, sy)) return false;
+    const target = this.get(sx, sy);
+    if (target === value) return false;
+
+    const stack = [sx, sy];
+    while (stack.length) {
+      const y = stack.pop();
+      const x = stack.pop();
+      if (!this.inBounds(x, y)) continue;
+      const i = this.index(x, y);
+      if (this.cells[i] !== target) continue;
+      this.cells[i] = value;
+      stack.push(x + 1, y, x - 1, y, x, y + 1, x, y - 1);
+    }
+    return true;
+  }
+
+  /** 채움 ↔ 비움 반전. 팔레트가 2색일 때만 의미가 있다. */
+  invert() {
+    for (let i = 0; i < this.cells.length; i++) {
+      this.cells[i] = this.cells[i] === OPEN ? FILLED : OPEN;
+    }
+  }
+
+  clear() {
+    this.cells.fill(OPEN);
+  }
+
+  /** 한 행을 [{ value, count }] 런렝스로 압축. */
+  runsOfRow(y) {
+    const runs = [];
+    for (let x = 0; x < this.cols; x++) {
+      const v = this.get(x, y);
+      const last = runs[runs.length - 1];
+      if (last && last.value === v) last.count++;
+      else runs.push({ value: v, count: 1 });
+    }
+    return runs;
+  }
+
+  // ---- 직렬화 ----
+
+  toJSON() {
+    return {
+      format: 'filet-crochet-pattern',
+      version: 1,
+      cols: this.cols,
+      rows: this.rows,
+      palette: this.palette,
+      // 런렝스: [값, 개수, 값, 개수, ...] — 행 순서대로 이어붙인 1차원
+      cells: encodeRLE(this.cells),
+    };
+  }
+
+  static fromJSON(data) {
+    if (!data || typeof data !== 'object') throw new Error('도안 파일이 아닙니다.');
+    const cols = Number(data.cols);
+    const rows = Number(data.rows);
+    if (!isValidSide(cols) || !isValidSide(rows)) {
+      throw new Error('격자 크기가 올바르지 않습니다.');
+    }
+
+    const palette = Array.isArray(data.palette) && data.palette.length >= 2
+      ? data.palette
+      : DEFAULT_PALETTE;
+    const p = new Pattern(cols, rows, palette);
+
+    const cells = decodeCells(data.cells, cols * rows, p.palette.length);
+    if (!cells) throw new Error('칸 데이터가 손상되었습니다.');
+    p.cells.set(cells);
+    return p;
+  }
+}
+
+function isValidSide(n) {
+  return Number.isInteger(n) && n >= 1 && n <= MAX_SIDE;
+}
+
+function encodeRLE(cells) {
+  const out = [];
+  let value = cells[0] ?? 0;
+  let count = 0;
+  for (let i = 0; i < cells.length; i++) {
+    if (cells[i] === value) {
+      count++;
+    } else {
+      out.push(value, count);
+      value = cells[i];
+      count = 1;
+    }
+  }
+  if (count) out.push(value, count);
+  return out;
+}
+
+/** RLE 배열, 또는 평면 배열도 받아준다. */
+function decodeCells(raw, expected, paletteSize) {
+  if (!Array.isArray(raw)) return null;
+
+  // RLE를 먼저 시도하되, 칸 수가 정확히 맞아떨어질 때만 인정한다.
+  // (짝수 길이 평면 배열이 RLE로 잘못 해석되는 것을 막기 위함)
+  const rle = decodeRLE(raw, expected, paletteSize);
+  if (rle) return rle;
+
+  if (raw.length === expected) return flatten(raw, paletteSize);
+  return null;
+}
+
+function decodeRLE(raw, expected, paletteSize) {
+  if (raw.length % 2 !== 0) return null;
+
+  const out = new Uint8Array(expected);
+  let at = 0;
+  for (let i = 0; i < raw.length; i += 2) {
+    const count = Number(raw[i + 1]);
+    if (!Number.isInteger(count) || count < 0) return null;
+    if (at + count > expected) return null;      // 넘치면 RLE가 아니다
+    out.fill(clampValue(raw[i], paletteSize), at, at + count);
+    at += count;
+  }
+  return at === expected ? out : null;
+}
+
+function flatten(raw, paletteSize) {
+  const out = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) out[i] = clampValue(raw[i], paletteSize);
+  return out;
+}
+
+function clampValue(v, paletteSize) {
+  const n = Number(v);
+  if (!Number.isInteger(n) || n < 0 || n >= paletteSize) return OPEN;
+  return n;
+}
