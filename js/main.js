@@ -60,18 +60,8 @@ function syncControlsFromState() {
   $('opt-numbers').checked = state.view.numbers;
   $('opt-symbols').checked = state.view.symbols;
   $('opt-boustrophedon').checked = state.view.boustrophedon;
-  // 칠하기 버튼은 draw/erase 두 상태를 겸한다 — 현재 상태를 아이콘과 글씨로 보여준다.
-  const erasing = state.tool === 'erase';
-  const drawBtn = document.querySelector('.tool[data-tool="draw"]');
-  drawBtn.querySelector('.tool-icon').textContent = erasing ? '🧽' : '✏️';
-  drawBtn.querySelector('.tool-label').textContent = erasing ? '지우기' : '칠하기';
-  drawBtn.classList.toggle('is-erasing', erasing);
-  drawBtn.title = erasing ? '지우기 — 다시 누르면 칠하기 (B)' : '칠하기 — 다시 누르면 지우기 (B)';
-
   for (const btn of document.querySelectorAll('.tool')) {
-    const active = btn.dataset.tool === state.tool
-      || (btn.dataset.tool === 'draw' && erasing);
-    btn.setAttribute('aria-pressed', String(active));
+    btn.setAttribute('aria-pressed', String(btn.dataset.tool === state.tool));
   }
 }
 
@@ -144,12 +134,7 @@ function bindTools() {
 }
 
 function setTool(tool) {
-  // 칠하기 버튼을 이미 선택된 상태에서 다시 누르면 지우기로 바뀐다 (그 반대도).
-  if (tool === 'draw' && (state.tool === 'draw' || state.tool === 'erase')) {
-    state.tool = state.tool === 'draw' ? 'erase' : 'draw';
-  } else {
-    state.tool = tool;
-  }
+  state.tool = tool;
   syncControlsFromState();
   persistView();
 }
@@ -261,10 +246,22 @@ function onPointerDown(e) {
     return;
   }
 
-  // 칠하기/지우기: 드래그하는 동안 지나간 칸을 같은 값으로 칠한다.
-  // 예전에는 시작 칸이 채워져 있으면 획 전체가 지우기로 뒤집혔는데,
-  // 긴 드래그에서 의도치 않게 지워지는 일이 잦아 버튼 상태만 따르도록 했다.
-  state.stroke = { tool, value: toolValue(), last: at, changed: false, pointerId: e.pointerId };
+  // 칠하기/지우기.
+  //
+  // 한 칸만 톡 누르면(탭) 그 칸을 토글하고, 끌면(드래그) 버튼 상태대로 칠한다.
+  // 탭인지 드래그인지는 손을 뗄 때 정해지므로, 판정에 필요한 정보를 들고 간다.
+  // 이렇게 하면 한 칸씩 고칠 때는 도구를 바꿀 필요가 없고, 길게 칠할 때는
+  // 시작 칸이 어떤 상태든 획 전체가 뒤집히지 않는다.
+  state.stroke = {
+    tool,
+    value: toolValue(),
+    start: at,
+    startValue: state.pattern.get(at.x, at.y),
+    last: at,
+    moved: false,
+    changed: false,
+    pointerId: e.pointerId,
+  };
   paintCell(at.x, at.y);
 }
 
@@ -288,6 +285,9 @@ function onPointerMove(e) {
   if (!s || s.pointerId !== e.pointerId || !at) return;
   e.preventDefault();
 
+  // 시작 칸을 벗어나면 드래그로 간주한다 (손을 뗄 때 탭 토글을 적용하지 않는다).
+  if (at.x !== s.start.x || at.y !== s.start.y) s.moved = true;
+
   // 빠르게 움직이면 포인터 이벤트가 칸을 건너뛴다 — 직선으로 이어 칠한다.
   lineCells(s.last, at, (x, y) => paintCell(x, y));
   s.last = at;
@@ -306,6 +306,13 @@ function onPointerUp(e) {
   const s = state.stroke;
   if (!s || s.pointerId !== e.pointerId) return;
   state.stroke = null;
+
+  // 한 칸에서 손을 뗐으면(탭) 그 칸을 토글한다.
+  // 이미 버튼 값대로 칠해져 있으므로, 원래 값이 같았을 때만 반대로 뒤집으면 된다.
+  if (!s.moved && s.startValue === s.value) {
+    const flipped = s.value === FILLED ? OPEN : FILLED;
+    if (state.pattern.set(s.start.x, s.start.y, flipped)) s.changed = true;
+  }
 
   s.changed ? commit() : render();
 }
@@ -609,8 +616,8 @@ function bindKeyboard() {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
 
     switch (e.key.toLowerCase()) {
-      case 'b': setTool('draw'); break;       // 다시 누르면 지우기로 전환
-      case 'e': state.tool = 'erase'; syncControlsFromState(); persistView(); break;
+      case 'b': setTool('draw'); break;
+      case 'e': setTool('erase'); break;
       case 'g': setTool('fill'); break;
       case '+': case '=': setCell(state.cell + 2); break;
       case '-': case '_': setCell(state.cell - 2); break;

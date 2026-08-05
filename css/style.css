@@ -131,8 +131,8 @@ input[type="number"] {
   font-weight: 600;
 }
 
-/* 지우기 상태는 색을 달리해 칠하기와 한눈에 구분되게 한다 */
-.tool.is-erasing[aria-pressed="true"] {
+/* 지우기가 선택됐을 때는 색을 달리해 그리기와 한눈에 구분되게 한다 */
+.tool[data-tool="erase"][aria-pressed="true"] {
   background: var(--erase-soft);
   border-color: var(--erase);
 }
@@ -302,9 +302,11 @@ input[type="number"] {
 
 /* 아주 좁은 폰(아이폰 SE 등)에서는 배율 숫자를 줄여 한 줄을 지킨다 */
 @media (max-width: 360px) {
-  #zoom-label { min-width: 32px; font-size: 11px; }
-  .zoom-group button { padding: 6px 6px; }
-  .tool, .edit-group button { padding: 8px 9px; }
+  #zoom-label { min-width: 30px; font-size: 11px; }
+  .zoom-group button { padding: 6px 5px; }
+  .tool, .edit-group button { padding: 8px 6px; font-size: 16px; }
+  .toolbar { gap: 3px; padding: 5px 4px; }
+  .edit-group { padding-left: 4px; }
   .canvas-wrap { padding: 8px; }
 }
 

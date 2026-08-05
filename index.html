@@ -32,9 +32,11 @@
   <main class="stage">
     <div class="toolbar" role="toolbar" aria-label="도구">
       <div class="tool-group" id="tools">
-        <!-- 칠하기: 다시 누르면 칠하기 ↔ 지우기가 바뀐다 (버튼 하나로 둘 다) -->
-        <button type="button" class="tool" data-tool="draw" aria-pressed="true" title="칠하기 — 다시 누르면 지우기 (B)">
-          <span class="tool-icon">✏️</span><span class="tool-label">칠하기</span>
+        <button type="button" class="tool" data-tool="draw" aria-pressed="true" title="그리기 (B)">
+          <span class="tool-icon">✏️</span><span class="tool-label">그리기</span>
+        </button>
+        <button type="button" class="tool" data-tool="erase" aria-pressed="false" title="지우기 (E)">
+          <span class="tool-icon">🧽</span><span class="tool-label">지우기</span>
         </button>
         <button type="button" class="tool" data-tool="fill" aria-pressed="false" title="채우기 (G)">
           <span class="tool-icon">🪣</span><span class="tool-label">채우기</span>
