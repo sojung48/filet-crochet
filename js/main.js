@@ -447,26 +447,6 @@ function bindPanel() {
 
   $('btn-copy-reading').addEventListener('click', copyReading);
 
-  $('btn-save').addEventListener('click', () => {
-    try {
-      setSaveHint(savePattern(state.pattern));
-      toast('로컬에 저장했습니다.');
-    } catch {
-      toast('저장 실패 (저장 공간 부족)');
-    }
-  });
-
-  $('btn-load').addEventListener('click', () => {
-    const saved = loadPattern();
-    if (!saved) return toast('저장된 도안이 없습니다.');
-    state.pattern = saved.pattern;
-    state.history.reset(state.pattern);
-    setSaveHint(saved.savedAt);
-    syncControlsFromState();
-    render();
-    toast('불러왔습니다.');
-  });
-
   $('btn-export-json').addEventListener('click', () => {
     downloadJSON(state.pattern, timestampName('json'));
   });

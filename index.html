@@ -108,17 +108,17 @@
     </section>
 
     <section class="panel-section">
-      <h2>저장 / 불러오기</h2>
-      <div class="field-row">
-        <button type="button" id="btn-save">로컬 저장</button>
-        <button type="button" id="btn-load">불러오기</button>
-      </div>
+      <h2>저장</h2>
+      <p class="hint" id="save-hint">자동 저장됨: –</p>
+      <p class="hint">
+        편집하면 이 기기에 자동으로 저장됩니다.
+        다른 기기로 옮기거나 백업하려면 JSON을 쓰세요.
+      </p>
       <div class="field-row">
         <button type="button" id="btn-export-json">JSON 내보내기</button>
         <button type="button" id="btn-import-json">JSON 가져오기</button>
       </div>
       <input type="file" id="file-json" accept="application/json,.json" hidden>
-      <p class="hint" id="save-hint">자동 저장됨: –</p>
     </section>
 
     <section class="panel-section">
