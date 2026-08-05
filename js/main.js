@@ -131,6 +131,35 @@ function bindTools() {
   $('btn-undo').addEventListener('click', undo);
   $('btn-redo').addEventListener('click', redo);
   $('btn-panel').addEventListener('click', () => $('panel').classList.toggle('open'));
+
+  $('btn-move-up').addEventListener('click', () => movePattern(0, -1));
+  $('btn-move-down').addEventListener('click', () => movePattern(0, 1));
+  $('btn-move-left').addEventListener('click', () => movePattern(-1, 0));
+  $('btn-move-right').addEventListener('click', () => movePattern(1, 0));
+}
+
+/**
+ * 도안 전체를 한 칸 옮긴다. 격자 밖으로 나간 칸은 잘려 나가므로,
+ * 되돌리려면 반대로 미는 게 아니라 실행취소를 써야 한다.
+ */
+function movePattern(dx, dy) {
+  const lost = wouldLoseCells(state.pattern, dx, dy);
+  if (!state.pattern.shift(dx, dy)) return;
+  commit();
+  if (lost) toast('가장자리 칸이 잘렸습니다. 되돌리려면 ↶');
+}
+
+/** 이동으로 채운 칸이 격자 밖으로 밀려나는지 미리 본다 (안내용). */
+function wouldLoseCells(p, dx, dy) {
+  for (let y = 0; y < p.rows; y++) {
+    for (let x = 0; x < p.cols; x++) {
+      if (p.get(x, y) === OPEN) continue;
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx < 0 || nx >= p.cols || ny < 0 || ny >= p.rows) return true;
+    }
+  }
+  return false;
 }
 
 function setTool(tool) {
@@ -622,6 +651,11 @@ function bindKeyboard() {
       case '+': case '=': setCell(state.cell + 2); break;
       case '-': case '_': setCell(state.cell - 2); break;
       case '0': zoomToFit(); break;
+      // 방향키로도 도안 전체를 옮긴다 (버튼과 같은 동작)
+      case 'arrowup': movePattern(0, -1); break;
+      case 'arrowdown': movePattern(0, 1); break;
+      case 'arrowleft': movePattern(-1, 0); break;
+      case 'arrowright': movePattern(1, 0); break;
       default: return;
     }
     e.preventDefault();

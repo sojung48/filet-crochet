@@ -62,6 +62,17 @@
       <canvas id="grid" aria-label="도안 격자"></canvas>
     </div>
 
+    <!-- 도안 전체 이동. 화살표로만 옮긴다 (한 번에 한 칸, 밖으로 나간 칸은 잘림) -->
+    <div class="movebar" role="group" aria-label="도안 전체 이동">
+      <span class="movebar-label">이동</span>
+      <div class="dpad">
+        <button type="button" id="btn-move-left" title="왼쪽으로 한 칸 (←)" aria-label="왼쪽으로 한 칸">◀</button>
+        <button type="button" id="btn-move-up" title="위로 한 칸 (↑)" aria-label="위로 한 칸">▲</button>
+        <button type="button" id="btn-move-down" title="아래로 한 칸 (↓)" aria-label="아래로 한 칸">▼</button>
+        <button type="button" id="btn-move-right" title="오른쪽으로 한 칸 (→)" aria-label="오른쪽으로 한 칸">▶</button>
+      </div>
+    </div>
+
     <div class="statusbar">
       <span id="status-pos">–</span>
       <span id="status-size">–</span>

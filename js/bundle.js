@@ -72,6 +72,37 @@ class Pattern {
     return p;
   }
 
+  /**
+   * 도안 전체를 dx, dy 칸만큼 옮긴다.
+   * 격자 밖으로 밀려난 칸은 잘라내고, 빈 자리는 비움으로 채운다.
+   *
+   * @returns {boolean} 실제로 바뀐 칸이 있었는지 (없으면 실행취소에 쌓지 않는다)
+   */
+  shift(dx, dy) {
+    if (!dx && !dy) return false;
+
+    const next = new Uint8Array(this.cells.length);
+    for (let y = 0; y < this.rows; y++) {
+      const ny = y + dy;
+      if (ny < 0 || ny >= this.rows) continue;     // 위아래로 밀려난 행은 버린다
+      for (let x = 0; x < this.cols; x++) {
+        const nx = x + dx;
+        if (nx < 0 || nx >= this.cols) continue;   // 좌우로 밀려난 칸도 버린다
+        next[ny * this.cols + nx] = this.cells[this.index(x, y)];
+      }
+    }
+
+    // 전부 비어 있거나 결과가 같으면 변경으로 치지 않는다
+    let changed = false;
+    for (let i = 0; i < next.length; i++) {
+      if (next[i] !== this.cells[i]) { changed = true; break; }
+    }
+    if (!changed) return false;
+
+    this.cells.set(next);
+    return true;
+  }
+
   /** 4방향 flood fill. @returns {boolean} 바뀐 칸이 있었는지 */
   floodFill(sx, sy, value) {
     if (!this.inBounds(sx, sy)) return false;
@@ -685,6 +716,35 @@ function bindTools() {
   $('btn-undo').addEventListener('click', undo);
   $('btn-redo').addEventListener('click', redo);
   $('btn-panel').addEventListener('click', () => $('panel').classList.toggle('open'));
+
+  $('btn-move-up').addEventListener('click', () => movePattern(0, -1));
+  $('btn-move-down').addEventListener('click', () => movePattern(0, 1));
+  $('btn-move-left').addEventListener('click', () => movePattern(-1, 0));
+  $('btn-move-right').addEventListener('click', () => movePattern(1, 0));
+}
+
+/**
+ * 도안 전체를 한 칸 옮긴다. 격자 밖으로 나간 칸은 잘려 나가므로,
+ * 되돌리려면 반대로 미는 게 아니라 실행취소를 써야 한다.
+ */
+function movePattern(dx, dy) {
+  const lost = wouldLoseCells(state.pattern, dx, dy);
+  if (!state.pattern.shift(dx, dy)) return;
+  commit();
+  if (lost) toast('가장자리 칸이 잘렸습니다. 되돌리려면 ↶');
+}
+
+/** 이동으로 채운 칸이 격자 밖으로 밀려나는지 미리 본다 (안내용). */
+function wouldLoseCells(p, dx, dy) {
+  for (let y = 0; y < p.rows; y++) {
+    for (let x = 0; x < p.cols; x++) {
+      if (p.get(x, y) === OPEN) continue;
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx < 0 || nx >= p.cols || ny < 0 || ny >= p.rows) return true;
+    }
+  }
+  return false;
 }
 
 function setTool(tool) {
@@ -1176,6 +1236,11 @@ function bindKeyboard() {
       case '+': case '=': setCell(state.cell + 2); break;
       case '-': case '_': setCell(state.cell - 2); break;
       case '0': zoomToFit(); break;
+      // 방향키로도 도안 전체를 옮긴다 (버튼과 같은 동작)
+      case 'arrowup': movePattern(0, -1); break;
+      case 'arrowdown': movePattern(0, 1); break;
+      case 'arrowleft': movePattern(-1, 0); break;
+      case 'arrowright': movePattern(1, 0); break;
       default: return;
     }
     e.preventDefault();

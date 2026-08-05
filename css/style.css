@@ -174,6 +174,36 @@ input[type="number"] {
   cursor: crosshair;
 }
 
+/* 전체 이동 바 — 캔버스 아래, 엄지가 닿기 쉬운 자리 */
+.movebar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+.movebar-label {
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: .04em;
+}
+
+/* 세로 공간이 아까워 한 줄로 눕힌다. 화살표 모양만으로 방향은 충분히 읽힌다 */
+.dpad {
+  display: flex;
+  gap: 4px;
+}
+.dpad button {
+  width: 46px;
+  height: 34px;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--muted);
+}
+
 .statusbar {
   display: flex;
   gap: 18px;
@@ -256,7 +286,8 @@ input[type="number"] {
 .toast {
   position: fixed;
   left: 50%;
-  bottom: 28px;
+  /* 이동 바와 상태바를 가리지 않도록 충분히 띄운다 */
+  bottom: 96px;
   transform: translate(-50%, 12px);
   background: var(--ink);
   color: var(--bg);

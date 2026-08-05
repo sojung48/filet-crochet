@@ -70,6 +70,37 @@ export class Pattern {
     return p;
   }
 
+  /**
+   * 도안 전체를 dx, dy 칸만큼 옮긴다.
+   * 격자 밖으로 밀려난 칸은 잘라내고, 빈 자리는 비움으로 채운다.
+   *
+   * @returns {boolean} 실제로 바뀐 칸이 있었는지 (없으면 실행취소에 쌓지 않는다)
+   */
+  shift(dx, dy) {
+    if (!dx && !dy) return false;
+
+    const next = new Uint8Array(this.cells.length);
+    for (let y = 0; y < this.rows; y++) {
+      const ny = y + dy;
+      if (ny < 0 || ny >= this.rows) continue;     // 위아래로 밀려난 행은 버린다
+      for (let x = 0; x < this.cols; x++) {
+        const nx = x + dx;
+        if (nx < 0 || nx >= this.cols) continue;   // 좌우로 밀려난 칸도 버린다
+        next[ny * this.cols + nx] = this.cells[this.index(x, y)];
+      }
+    }
+
+    // 전부 비어 있거나 결과가 같으면 변경으로 치지 않는다
+    let changed = false;
+    for (let i = 0; i < next.length; i++) {
+      if (next[i] !== this.cells[i]) { changed = true; break; }
+    }
+    if (!changed) return false;
+
+    this.cells.set(next);
+    return true;
+  }
+
   /** 4방향 flood fill. @returns {boolean} 바뀐 칸이 있었는지 */
   floodFill(sx, sy, value) {
     if (!this.inBounds(sx, sy)) return false;
