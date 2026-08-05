@@ -74,20 +74,25 @@ class Pattern {
 
   /**
    * 도안 전체를 dx, dy 칸만큼 옮긴다.
-   * 격자 밖으로 밀려난 칸은 잘라내고, 빈 자리는 비움으로 채운다.
+   *
+   * 격자 밖으로 나간 칸은 사라지지 않고 반대편 끝으로 돌아 들어온다.
+   * 잘라내면 반대로 밀어도 복구되지 않아 실행취소에 기대야 하는데,
+   * 감싸기는 항상 되돌릴 수 있고 규칙도 하나뿐이라 예측하기 쉽다.
    *
    * @returns {boolean} 실제로 바뀐 칸이 있었는지 (없으면 실행취소에 쌓지 않는다)
    */
   shift(dx, dy) {
     if (!dx && !dy) return false;
 
+    // 음수 이동에서도 양수 나머지가 나오도록 한 번 더 더한다
+    const sx = ((dx % this.cols) + this.cols) % this.cols;
+    const sy = ((dy % this.rows) + this.rows) % this.rows;
+
     const next = new Uint8Array(this.cells.length);
     for (let y = 0; y < this.rows; y++) {
-      const ny = y + dy;
-      if (ny < 0 || ny >= this.rows) continue;     // 위아래로 밀려난 행은 버린다
+      const ny = (y + sy) % this.rows;
       for (let x = 0; x < this.cols; x++) {
-        const nx = x + dx;
-        if (nx < 0 || nx >= this.cols) continue;   // 좌우로 밀려난 칸도 버린다
+        const nx = (x + sx) % this.cols;
         next[ny * this.cols + nx] = this.cells[this.index(x, y)];
       }
     }
@@ -724,27 +729,11 @@ function bindTools() {
 }
 
 /**
- * 도안 전체를 한 칸 옮긴다. 격자 밖으로 나간 칸은 잘려 나가므로,
- * 되돌리려면 반대로 미는 게 아니라 실행취소를 써야 한다.
+ * 도안 전체를 한 칸 옮긴다.
+ * 밖으로 나간 칸은 반대편으로 돌아 들어오므로 반대로 밀면 그대로 복구된다.
  */
 function movePattern(dx, dy) {
-  const lost = wouldLoseCells(state.pattern, dx, dy);
-  if (!state.pattern.shift(dx, dy)) return;
-  commit();
-  if (lost) toast('가장자리 칸이 잘렸습니다. 되돌리려면 ↶');
-}
-
-/** 이동으로 채운 칸이 격자 밖으로 밀려나는지 미리 본다 (안내용). */
-function wouldLoseCells(p, dx, dy) {
-  for (let y = 0; y < p.rows; y++) {
-    for (let x = 0; x < p.cols; x++) {
-      if (p.get(x, y) === OPEN) continue;
-      const nx = x + dx;
-      const ny = y + dy;
-      if (nx < 0 || nx >= p.cols || ny < 0 || ny >= p.rows) return true;
-    }
-  }
-  return false;
+  if (state.pattern.shift(dx, dy)) commit();
 }
 
 function setTool(tool) {
