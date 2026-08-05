@@ -6,8 +6,7 @@
 
 **웹에서 열기** — 폰·태블릿·PC 어디서든:
 
-<!-- 배포 후 아래 주소로 접속. GitHub Pages 설정에서 확인 가능 -->
-https://<사용자명>.github.io/filet-crochet/
+### https://sojung48.github.io/filet-crochet/
 
 폰에서 자주 쓴다면 브라우저 메뉴의 **홈 화면에 추가**를 해두면 앱처럼 열립니다.
 
