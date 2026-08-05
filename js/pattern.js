@@ -14,7 +14,21 @@ export const DEFAULT_PALETTE = [
   { name: '채움', css: 'var(--cell-filled)' },
 ];
 
-export const MAX_SIDE = 300;
+/**
+ * 격자 한 변의 최대 칸 수.
+ *
+ * 300까지 열어두면 최대 배율·고해상도 화면과 겹칠 때 캔버스가 브라우저
+ * 한계를 넘어 화면이 통째로 비어버린다. 실행취소 스냅샷 메모리도 함께
+ * 커진다. 실제 뜨개 도안은 100칸이면 충분히 크다.
+ */
+export const MAX_SIDE = 100;
+
+/**
+ * 이미 만들어 둔 도안을 열 때만 허용하는 상한.
+ * 상한을 낮추기 전에 저장한 파일이 갑자기 안 열리면 안 되므로,
+ * 새로 만들 때(MAX_SIDE)보다 넉넉하게 받아준다.
+ */
+export const MAX_SIDE_IMPORT = 300;
 
 export class Pattern {
   constructor(cols = 30, rows = 30, palette = DEFAULT_PALETTE) {
@@ -183,7 +197,7 @@ export class Pattern {
 }
 
 function isValidSide(n) {
-  return Number.isInteger(n) && n >= 1 && n <= MAX_SIDE;
+  return Number.isInteger(n) && n >= 1 && n <= MAX_SIDE_IMPORT;
 }
 
 function encodeRLE(cells) {

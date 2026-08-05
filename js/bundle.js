@@ -13,7 +13,21 @@
 /** 팔레트. 인덱스 순서가 곧 칸 값이다. */const DEFAULT_PALETTE = [
   { name: '비움', css: 'transparent' },
   { name: '채움', css: 'var(--cell-filled)' },
-];const MAX_SIDE = 300;class Pattern {
+];
+
+/**
+ * 격자 한 변의 최대 칸 수.
+ *
+ * 300까지 열어두면 최대 배율·고해상도 화면과 겹칠 때 캔버스가 브라우저
+ * 한계를 넘어 화면이 통째로 비어버린다. 실행취소 스냅샷 메모리도 함께
+ * 커진다. 실제 뜨개 도안은 100칸이면 충분히 크다.
+ */const MAX_SIDE = 100;
+
+/**
+ * 이미 만들어 둔 도안을 열 때만 허용하는 상한.
+ * 상한을 낮추기 전에 저장한 파일이 갑자기 안 열리면 안 되므로,
+ * 새로 만들 때(MAX_SIDE)보다 넉넉하게 받아준다.
+ */const MAX_SIDE_IMPORT = 300;class Pattern {
   constructor(cols = 30, rows = 30, palette = DEFAULT_PALETTE) {
     this.cols = cols;
     this.rows = rows;
@@ -180,7 +194,7 @@
 }
 
 function isValidSide(n) {
-  return Number.isInteger(n) && n >= 1 && n <= MAX_SIDE;
+  return Number.isInteger(n) && n >= 1 && n <= MAX_SIDE_IMPORT;
 }
 
 function encodeRLE(cells) {
@@ -597,6 +611,13 @@ const $ = (id) => document.getElementById(id);
 const MIN_CELL = 4;
 const MAX_CELL = 48;
 
+/**
+ * 캔버스 한 변의 안전 상한(픽셀).
+ * 브라우저마다 다르지만 대체로 16384가 한계라 여유를 두고 잡는다.
+ * 넘으면 캔버스가 통째로 비어 아무것도 그려지지 않는다.
+ */
+const MAX_CANVAS_PX = 15000;
+
 const state = {
   pattern: new Pattern(30, 30),
   history: null,
@@ -627,6 +648,8 @@ function init() {
     setSaveHint(saved.savedAt);
   }
   state.history = new History(state.pattern);
+  // 배율을 도안보다 먼저 읽으므로, 도안 크기를 안 뒤 다시 상한에 맞춘다.
+  state.cell = clamp(state.cell, MIN_CELL, maxCellForPattern());
 
   syncControlsFromState();
   bindTools();
@@ -667,7 +690,15 @@ function themeColors() {
 function render() {
   const { cell, view } = state;
   const size = canvasSize(state.pattern, cell, view.numbers);
-  const dpr = window.devicePixelRatio || 1;
+
+  // 캔버스가 브라우저 한계를 넘으면 그리기가 통째로 실패한다 — 오류도 없이
+  // 화면이 하얗게 비어 원인조차 알 수 없다. 큰 격자를 최대 배율로 확대하고
+  // 고해상도 화면까지 겹치면 실제로 닿는다(예: 300칸 × 48px × DPR 3).
+  // 그때는 선명도를 조금 포기하더라도 그려지는 쪽이 낫다.
+  const dpr = Math.max(1, Math.min(
+    window.devicePixelRatio || 1,
+    MAX_CANVAS_PX / Math.max(size.width, size.height),
+  ));
 
   canvas.style.width = `${size.width}px`;
   canvas.style.height = `${size.height}px`;
@@ -737,8 +768,18 @@ function setTool(tool) {
   persistView();
 }
 
+/**
+ * 이 격자에서 허용할 최대 칸 크기.
+ * 칸이 커질수록 캔버스도 커지므로, 큰 격자에서는 확대 상한을 낮춰야 한다.
+ */
+function maxCellForPattern() {
+  const p = state.pattern;
+  const longest = Math.max(p.cols, p.rows);
+  return clamp(Math.floor(MAX_CANVAS_PX / longest), MIN_CELL, MAX_CELL);
+}
+
 function setCell(next) {
-  state.cell = clamp(Math.round(next), MIN_CELL, MAX_CELL);
+  state.cell = clamp(Math.round(next), MIN_CELL, maxCellForPattern());
   persistView();
   render();
 }
@@ -940,7 +981,7 @@ function zoomAround(nextCell, clientX, clientY) {
   const ry = (clientY - before.top) / before.height;
 
   const prev = state.cell;
-  state.cell = clamp(Math.round(nextCell), MIN_CELL, MAX_CELL);
+  state.cell = clamp(Math.round(nextCell), MIN_CELL, maxCellForPattern());
   if (state.cell === prev) return;
   persistView();
   render();
@@ -1044,6 +1085,7 @@ function bindPanel() {
     try {
       state.pattern = await readJSONFile(file);
       state.history.reset(state.pattern);
+      state.cell = clamp(state.cell, MIN_CELL, maxCellForPattern());
       syncControlsFromState();
       render();
       autosave();
@@ -1096,6 +1138,8 @@ function applyResize() {
   }
 
   state.pattern = state.pattern.resized(cols, rows);
+  // 격자가 커지면 지금 배율이 캔버스 한계를 넘길 수 있다 — 상한에 맞춰 낮춘다.
+  state.cell = clamp(state.cell, MIN_CELL, maxCellForPattern());
   syncControlsFromState();
   commit();
 }
