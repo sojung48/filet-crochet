@@ -8,17 +8,12 @@
  *
  * 칸 값은 boolean이 아니라 팔레트 인덱스(0 = 비움, 1 = 채움)로 둔다.
  * 2단계에서 다색 그래프 도안으로 확장할 때 저장 포맷을 그대로 쓰기 위함.
- */
-const OPEN = 0;
-const FILLED = 1;
+ */const OPEN = 0;const FILLED = 1;
 
-/** 팔레트. 인덱스 순서가 곧 칸 값이다. */
-const DEFAULT_PALETTE = [
+/** 팔레트. 인덱스 순서가 곧 칸 값이다. */const DEFAULT_PALETTE = [
   { name: '비움', css: 'transparent' },
   { name: '채움', css: 'var(--cell-filled)' },
-];
-const MAX_SIDE = 300;
-class Pattern {
+];const MAX_SIDE = 300;class Pattern {
   constructor(cols = 30, rows = 30, palette = DEFAULT_PALETTE) {
     this.cols = cols;
     this.rows = rows;
