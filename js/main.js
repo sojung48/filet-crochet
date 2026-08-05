@@ -60,8 +60,18 @@ function syncControlsFromState() {
   $('opt-numbers').checked = state.view.numbers;
   $('opt-symbols').checked = state.view.symbols;
   $('opt-boustrophedon').checked = state.view.boustrophedon;
+  // 칠하기 버튼은 draw/erase 두 상태를 겸한다 — 현재 상태를 아이콘과 글씨로 보여준다.
+  const erasing = state.tool === 'erase';
+  const drawBtn = document.querySelector('.tool[data-tool="draw"]');
+  drawBtn.querySelector('.tool-icon').textContent = erasing ? '🧽' : '✏️';
+  drawBtn.querySelector('.tool-label').textContent = erasing ? '지우기' : '칠하기';
+  drawBtn.classList.toggle('is-erasing', erasing);
+  drawBtn.title = erasing ? '지우기 — 다시 누르면 칠하기 (B)' : '칠하기 — 다시 누르면 지우기 (B)';
+
   for (const btn of document.querySelectorAll('.tool')) {
-    btn.setAttribute('aria-pressed', String(btn.dataset.tool === state.tool));
+    const active = btn.dataset.tool === state.tool
+      || (btn.dataset.tool === 'draw' && erasing);
+    btn.setAttribute('aria-pressed', String(active));
   }
 }
 
@@ -96,7 +106,6 @@ function render() {
     numbers: view.numbers,
     symbols: view.symbols,
     colors: themeColors(),
-    preview: rectPreview(),
   });
 
   $('zoom-label').textContent = `${Math.round((cell / 18) * 100)}%`;
@@ -104,12 +113,6 @@ function render() {
   $('btn-redo').disabled = !state.history.canRedo;
   updateStatus();
   updateReading();
-}
-
-function rectPreview() {
-  const s = state.stroke;
-  if (!s || s.tool !== 'rect' || !s.current) return null;
-  return { x0: s.start.x, y0: s.start.y, x1: s.current.x, y1: s.current.y, value: s.value };
 }
 
 function updateStatus() {
@@ -141,7 +144,12 @@ function bindTools() {
 }
 
 function setTool(tool) {
-  state.tool = tool;
+  // 칠하기 버튼을 이미 선택된 상태에서 다시 누르면 지우기로 바뀐다 (그 반대도).
+  if (tool === 'draw' && (state.tool === 'draw' || state.tool === 'erase')) {
+    state.tool = state.tool === 'draw' ? 'erase' : 'draw';
+  } else {
+    state.tool = tool;
+  }
   syncControlsFromState();
   persistView();
 }
@@ -253,18 +261,10 @@ function onPointerDown(e) {
     return;
   }
 
-  if (tool === 'rect') {
-    state.stroke = { tool, start: at, current: at, value: toolValue(), pointerId: e.pointerId };
-    render();
-    return;
-  }
-
-  // draw / erase: 드래그하는 동안 지나간 칸을 칠한다.
-  // 첫 클릭이 이미 같은 값이면 반대로 뒤집어 한 번 탭으로 토글이 되게 한다.
-  let value = toolValue();
-  if (tool === 'draw' && state.pattern.get(at.x, at.y) === FILLED) value = OPEN;
-
-  state.stroke = { tool, value, last: at, changed: false, pointerId: e.pointerId };
+  // 칠하기/지우기: 드래그하는 동안 지나간 칸을 같은 값으로 칠한다.
+  // 예전에는 시작 칸이 채워져 있으면 획 전체가 지우기로 뒤집혔는데,
+  // 긴 드래그에서 의도치 않게 지워지는 일이 잦아 버튼 상태만 따르도록 했다.
+  state.stroke = { tool, value: toolValue(), last: at, changed: false, pointerId: e.pointerId };
   paintCell(at.x, at.y);
 }
 
@@ -288,14 +288,6 @@ function onPointerMove(e) {
   if (!s || s.pointerId !== e.pointerId || !at) return;
   e.preventDefault();
 
-  if (s.tool === 'rect') {
-    if (s.current.x !== at.x || s.current.y !== at.y) {
-      s.current = at;
-      render();
-    }
-    return;
-  }
-
   // 빠르게 움직이면 포인터 이벤트가 칸을 건너뛴다 — 직선으로 이어 칠한다.
   lineCells(s.last, at, (x, y) => paintCell(x, y));
   s.last = at;
@@ -314,18 +306,6 @@ function onPointerUp(e) {
   const s = state.stroke;
   if (!s || s.pointerId !== e.pointerId) return;
   state.stroke = null;
-
-  if (s.tool === 'rect') {
-    const { start, current, value } = s;
-    let changed = false;
-    for (let y = Math.min(start.y, current.y); y <= Math.max(start.y, current.y); y++) {
-      for (let x = Math.min(start.x, current.x); x <= Math.max(start.x, current.x); x++) {
-        if (state.pattern.set(x, y, value)) changed = true;
-      }
-    }
-    changed ? commit() : render();
-    return;
-  }
 
   s.changed ? commit() : render();
 }
@@ -491,16 +471,19 @@ function bindPanel() {
   $('btn-png').addEventListener('click', exportPNG);
   $('btn-print').addEventListener('click', printPattern);
 
-  $('btn-clear').addEventListener('click', () => {
-    if (!state.pattern.countOf(FILLED)) return;
-    if (!confirm('모든 칸을 비웁니다. 계속할까요?')) return;
+  // 비우기·반전은 상단바에 있다. 확인 창 없이 바로 실행하고,
+  // 실수하면 실행취소(↶)로 되돌린다 — 매번 묻는 쪽이 더 번거롭다.
+  $('btn-clear-top').addEventListener('click', () => {
+    if (!state.pattern.countOf(FILLED)) return toast('이미 비어 있습니다.');
     state.pattern.clear();
     commit();
+    toast('전체 비웠습니다. 되돌리려면 ↶');
   });
 
-  $('btn-invert').addEventListener('click', () => {
+  $('btn-invert-top').addEventListener('click', () => {
     state.pattern.invert();
     commit();
+    toast('반전했습니다. 되돌리려면 ↶');
   });
 }
 
@@ -626,9 +609,8 @@ function bindKeyboard() {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
 
     switch (e.key.toLowerCase()) {
-      case 'b': setTool('draw'); break;
-      case 'e': setTool('erase'); break;
-      case 'r': setTool('rect'); break;
+      case 'b': setTool('draw'); break;       // 다시 누르면 지우기로 전환
+      case 'e': state.tool = 'erase'; syncControlsFromState(); persistView(); break;
       case 'g': setTool('fill'); break;
       case '+': case '=': setCell(state.cell + 2); break;
       case '-': case '_': setCell(state.cell - 2); break;

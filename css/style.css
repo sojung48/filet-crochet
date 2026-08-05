@@ -7,6 +7,8 @@
   --muted: #6f6a60;
   --accent: #7b5e3b;
   --accent-soft: #eee7dc;
+  --erase: #a8543f;
+  --erase-soft: #f6e4de;
   --cell-filled: #2f2a24;
   --panel-w: 320px;
   --topbar-h: 48px;
@@ -22,6 +24,8 @@
     --muted: #a09a8d;
     --accent: #c9a06a;
     --accent-soft: #342f26;
+    --erase: #d08a70;
+    --erase-soft: #3a2a24;
     --cell-filled: #ece7dd;
   }
 }
@@ -111,15 +115,38 @@ input[type="number"] {
 }
 .tool-group { display: flex; gap: 6px; align-items: center; }
 
-.tool {
+/* 모든 도구 버튼은 아이콘만 쓴다. 이름은 title 속성(마우스를 올리면 표시)에 있다. */
+.tool, .edit-group button {
   display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
+  white-space: nowrap;
+  font-size: 18px;
+  padding: 7px 12px;
 }
+.tool-label { display: none; }
 .tool[aria-pressed="true"] {
   background: var(--accent-soft);
   border-color: var(--accent);
   font-weight: 600;
+}
+
+/* 지우기 상태는 색을 달리해 칠하기와 한눈에 구분되게 한다 */
+.tool.is-erasing[aria-pressed="true"] {
+  background: var(--erase-soft);
+  border-color: var(--erase);
+}
+
+/* 비우기·반전은 도구가 아니라 즉시 실행이므로 시각적으로 구분해 둔다 */
+.edit-group {
+  padding-left: 10px;
+  border-left: 1px solid var(--line);
+}
+.edit-group button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
 }
 .zoom-group { margin-left: auto; }
 #zoom-label {
@@ -263,14 +290,21 @@ input[type="number"] {
   }
   .panel.open { transform: none; }
 
-  .tool span { display: none; }
-  .tool { padding: 6px 10px; font-size: 16px; }
+  .tool, .edit-group button { padding: 8px 11px; }
   /* 도구와 배율을 한 줄에 유지한다 — 폰에서는 세로 공간이 아깝다 */
-  .toolbar { gap: 6px; padding: 5px 8px; flex-wrap: nowrap; }
+  .toolbar { gap: 5px; padding: 5px 6px; flex-wrap: nowrap; }
+  .edit-group { padding-left: 6px; }
   .zoom-group { gap: 4px; }
   .zoom-group button { padding: 6px 8px; }
   #zoom-label { min-width: 42px; font-size: 12px; }
   #btn-zoom-fit { display: none; }   /* 핀치가 있으니 '맞춤'은 불필요 */
+}
+
+/* 아주 좁은 폰(아이폰 SE 등)에서는 배율 숫자를 줄여 한 줄을 지킨다 */
+@media (max-width: 360px) {
+  #zoom-label { min-width: 32px; font-size: 11px; }
+  .zoom-group button { padding: 6px 6px; }
+  .tool, .edit-group button { padding: 8px 9px; }
   .canvas-wrap { padding: 8px; }
 }
 

@@ -32,10 +32,21 @@
   <main class="stage">
     <div class="toolbar" role="toolbar" aria-label="도구">
       <div class="tool-group" id="tools">
-        <button type="button" class="tool" data-tool="draw" aria-pressed="true" title="그리기 (B)">✏️<span>그리기</span></button>
-        <button type="button" class="tool" data-tool="erase" aria-pressed="false" title="지우기 (E)">🧽<span>지우기</span></button>
-        <button type="button" class="tool" data-tool="rect" aria-pressed="false" title="사각형 (R)">▭<span>사각형</span></button>
-        <button type="button" class="tool" data-tool="fill" aria-pressed="false" title="채우기 (G)">🪣<span>채우기</span></button>
+        <!-- 칠하기: 다시 누르면 칠하기 ↔ 지우기가 바뀐다 (버튼 하나로 둘 다) -->
+        <button type="button" class="tool" data-tool="draw" aria-pressed="true" title="칠하기 — 다시 누르면 지우기 (B)">
+          <span class="tool-icon">✏️</span><span class="tool-label">칠하기</span>
+        </button>
+        <button type="button" class="tool" data-tool="fill" aria-pressed="false" title="채우기 (G)">
+          <span class="tool-icon">🪣</span><span class="tool-label">채우기</span>
+        </button>
+      </div>
+      <div class="tool-group edit-group">
+        <button type="button" id="btn-clear-top" title="전체 비우기">
+          <span class="tool-icon">🗑</span><span class="tool-label">비우기</span>
+        </button>
+        <button type="button" id="btn-invert-top" title="반전">
+          <span class="tool-icon">◐</span><span class="tool-label">반전</span>
+        </button>
       </div>
       <div class="tool-group zoom-group">
         <button type="button" id="btn-zoom-out" title="축소 (−)">−</button>
@@ -105,13 +116,6 @@
       </div>
     </section>
 
-    <section class="panel-section">
-      <h2>편집</h2>
-      <div class="field-row">
-        <button type="button" id="btn-clear">전체 비우기</button>
-        <button type="button" id="btn-invert">반전</button>
-      </div>
-    </section>
   </aside>
 
 </div>
