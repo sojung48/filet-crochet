@@ -587,7 +587,7 @@ function exportPNG() {
 
 function printPattern() {
   const p = state.pattern;
-  $('print-title').textContent = `필레 크로셰 도안 — ${p.cols} × ${p.rows}칸`;
+  $('print-title').textContent = `방안 뜨기 도안 — ${p.cols} × ${p.rows}칸`;
   $('print-img').src = renderForExport().toDataURL('image/png');
   $('print-reading').innerHTML = readingToHTML(readingCache ?? []);
 
