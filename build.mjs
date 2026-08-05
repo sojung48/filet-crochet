@@ -9,6 +9,7 @@
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -38,4 +39,24 @@ ${parts.join('\n')}
 `;
 
 writeFileSync(join(root, 'js', 'bundle.js'), out, 'utf8');
-console.log(`js/bundle.js 생성 완료 (${(out.length / 1024).toFixed(1)} KB)`);
+
+// 캐시 무력화.
+//
+// GitHub Pages는 파일을 10분간 캐시하라고 알려준다(max-age=600). 그래서
+// 새로 배포해도 폰이 옛 bundle.js를 계속 쓸 수 있고, HTML만 새것이 되면
+// 둘이 어긋나 이상하게 동작한다. 파일 내용의 해시를 주소 뒤에 붙이면
+// 내용이 바뀔 때마다 주소가 달라져 캐시가 끼어들 자리가 없다.
+const hash = createHash('sha256').update(out).digest('hex').slice(0, 8);
+const htmlPath = join(root, 'index.html');
+const html = readFileSync(htmlPath, 'utf8');
+const patched = html.replace(
+  /(<script defer src="js\/bundle\.js)(\?v=[a-f0-9]+)?(">)/,
+  `$1?v=${hash}$3`,
+);
+if (patched === html && !html.includes(`bundle.js?v=${hash}`)) {
+  console.warn('경고: index.html의 스크립트 태그를 찾지 못해 버전을 붙이지 못했습니다.');
+} else if (patched !== html) {
+  writeFileSync(htmlPath, patched, 'utf8');
+}
+
+console.log(`js/bundle.js 생성 완료 (${(out.length / 1024).toFixed(1)} KB, v=${hash})`);

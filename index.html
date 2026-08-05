@@ -62,7 +62,7 @@
       <canvas id="grid" aria-label="도안 격자"></canvas>
     </div>
 
-    <!-- 도안 전체 이동. 화살표로만 옮긴다 (한 번에 한 칸, 밖으로 나간 칸은 잘림) -->
+    <!-- 도안 전체 이동. 한 번에 한 칸씩, 밖으로 나간 칸은 반대편으로 돌아 들어온다 -->
     <div class="movebar" role="group" aria-label="도안 전체 이동">
       <span class="movebar-label">이동</span>
       <div class="dpad">
@@ -144,6 +144,6 @@
 
 <!-- 번들(일반 스크립트)이라 index.html을 그냥 더블클릭해도 동작한다.
      원본은 js/*.js 이고, 수정 후에는 "node build.mjs"로 다시 만든다. -->
-<script defer src="js/bundle.js"></script>
+<script defer src="js/bundle.js?v=59da6428"></script>
 </body>
 </html>
