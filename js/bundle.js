@@ -871,10 +871,15 @@ const FONT_PX = 12;
 /** 글자 한 줄이 차지하는 높이(칸). 12px에서 잉크는 11칸까지 닿는다. */const GLYPH_HEIGHT = 11;
 
 /**
- * 이진화 기준. 외곽선을 그리며 생긴 흐린 가장자리를 어디까지 칸으로
- * 칠지 정한다. 190은 획이 끊기지 않으면서 번지지도 않는 값이다.
+ * 이진화 기준. 외곽선을 그리며 생긴 흐린 가장자리를 어디까지 칸으로 칠지
+ * 정한다. 실제로 찍어 비교해 128로 정했다:
+ *
+ *   임계 190 — 가장자리를 너무 많이 먹어 획이 2칸으로 굵어진다.
+ *              갈무리 특유의 1칸 획이 뭉개져 다른 글꼴처럼 보인다.
+ *   임계 128 — 폰트에 든 비트맵과 가장 가깝다. ← 이걸 쓴다
+ *   임계 100 이하 — 흐린 부분을 버려 획이 끊긴다.
  */
-const INK_THRESHOLD = 190;
+const INK_THRESHOLD = 128;
 
 /**
  * 이름에 TEXT_를 붙인 이유: 빌드가 모듈들을 한 스코프로 합치므로
@@ -883,6 +888,7 @@ const INK_THRESHOLD = 190;
  */const TEXT_DEFAULTS = {
   letterSpacing: 1,
   lineSpacing: 1,
+  align: 'center',        // 'left' | 'center' | 'right'
 };
 
 let scratch = null;
@@ -1024,19 +1030,27 @@ function rasterLine(line, letterSpacing) {
  *
  * @param {Pattern} into 찍어 넣을 도안 (그대로 바뀐다)
  */function renderText(into, text, options) {
-  const { letterSpacing, lineSpacing } = { ...TEXT_DEFAULTS, ...options };
+  const { letterSpacing, lineSpacing, align } = { ...TEXT_DEFAULTS, ...options };
   const lines = text.split('\n');
   const size = measureText(text, { letterSpacing, lineSpacing });
 
-  // 가운데 정렬. 처음부터 가운데 있는 편이 손이 덜 간다
-  // (자리를 옮기고 싶으면 전체 이동 기능이 있다).
+  // 세로는 늘 가운데. 위아래 정렬까지 두면 고를 것만 늘고,
+  // 자리를 옮기고 싶으면 전체 이동(◀▲▼▶)이 이미 있다.
   const originY = Math.floor((into.rows - size.rows) / 2);
+
+  // 여러 줄일 때 정렬은 "가장 긴 줄"이 아니라 도안 전체를 기준으로 잡는다.
+  // 그래야 왼쪽 정렬한 줄들의 시작점이 서로 어긋나지 않는다.
+  const startX = (w) => {
+    if (align === 'left') return 0;
+    if (align === 'right') return into.cols - w;
+    return Math.floor((into.cols - w) / 2);
+  };
 
   lines.forEach((line, li) => {
     const g = rasterLine(line, letterSpacing);
     if (!g.w) return;
 
-    const cx = Math.floor((into.cols - g.w) / 2);
+    const cx = startX(g.w);
     const cy = originY + li * (GLYPH_HEIGHT + lineSpacing);
 
     for (let y = 0; y < g.h; y++) {
@@ -1113,7 +1127,7 @@ const state = {
   tab: 'pattern',
   // 이미지 탭. source는 세션 동안만 살아 있고 저장하지 않는다.
   image: { source: null, options: { ...DEFAULT_OPTIONS } },
-  text: { letterSpacing: 1, lineSpacing: 1 },
+  text: { letterSpacing: 1, lineSpacing: 1, align: 'center' },
   // 진행 중인 스트로크
   stroke: null,
   dirty: false,
@@ -1177,6 +1191,9 @@ function syncControlsFromState() {
 
   $('in-letter-gap').value = state.text.letterSpacing;
   $('in-line-gap').value = state.text.lineSpacing;
+  for (const btn of document.querySelectorAll('.align')) {
+    btn.setAttribute('aria-pressed', String(btn.dataset.align === state.text.align));
+  }
 }
 
 // ---------------------------------------------------------------- 렌더링
@@ -1848,6 +1865,13 @@ function bindTextTab() {
       renderTextPreview();
     });
   }
+  for (const btn of document.querySelectorAll('.align')) {
+    btn.addEventListener('click', () => {
+      state.text.align = btn.dataset.align;
+      syncControlsFromState();
+      renderTextPreview();
+    });
+  }
   $('btn-text-apply').addEventListener('click', applyText);
 
   // 글꼴을 미리 받아둔다. 준비되면 그동안 잰 글리프를 버리고 다시 그린다.
@@ -1912,9 +1936,13 @@ function renderTextPreview() {
     $('btn-text-apply').disabled = false;
   }
 
-  // 미리보기는 넘치더라도 잘라서 보여준다 — 무엇이 문제인지 눈으로 보인다.
-  const cols = Math.min(m.cols, MAX_SIDE);
-  const rows = Math.min(m.rows, MAX_SIDE);
+  // 미리보기는 실제 도안 폭으로 그린다.
+  //
+  // 글자에 딱 맞춘 폭으로 그리면 좌·가운데·우 정렬이 전부 똑같아 보인다
+  // — 글자밖에 없으니 밀 자리가 없다. 도안이 글자보다 좁으면 적용할 때
+  // 어차피 키울 것이므로, 그 키운 크기로 미리 보여준다.
+  const cols = Math.min(Math.max(m.cols, state.pattern.cols), MAX_SIDE);
+  const rows = Math.min(Math.max(m.rows, state.pattern.rows), MAX_SIDE);
   const preview = new Pattern(cols, rows);
   renderText(preview, text, state.text);
 

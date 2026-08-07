@@ -35,7 +35,7 @@ const state = {
   tab: 'pattern',
   // 이미지 탭. source는 세션 동안만 살아 있고 저장하지 않는다.
   image: { source: null, options: { ...DEFAULT_OPTIONS } },
-  text: { letterSpacing: 1, lineSpacing: 1 },
+  text: { letterSpacing: 1, lineSpacing: 1, align: 'center' },
   // 진행 중인 스트로크
   stroke: null,
   dirty: false,
@@ -99,6 +99,9 @@ function syncControlsFromState() {
 
   $('in-letter-gap').value = state.text.letterSpacing;
   $('in-line-gap').value = state.text.lineSpacing;
+  for (const btn of document.querySelectorAll('.align')) {
+    btn.setAttribute('aria-pressed', String(btn.dataset.align === state.text.align));
+  }
 }
 
 // ---------------------------------------------------------------- 렌더링
@@ -770,6 +773,13 @@ function bindTextTab() {
       renderTextPreview();
     });
   }
+  for (const btn of document.querySelectorAll('.align')) {
+    btn.addEventListener('click', () => {
+      state.text.align = btn.dataset.align;
+      syncControlsFromState();
+      renderTextPreview();
+    });
+  }
   $('btn-text-apply').addEventListener('click', applyText);
 
   // 글꼴을 미리 받아둔다. 준비되면 그동안 잰 글리프를 버리고 다시 그린다.
@@ -834,9 +844,13 @@ function renderTextPreview() {
     $('btn-text-apply').disabled = false;
   }
 
-  // 미리보기는 넘치더라도 잘라서 보여준다 — 무엇이 문제인지 눈으로 보인다.
-  const cols = Math.min(m.cols, MAX_SIDE);
-  const rows = Math.min(m.rows, MAX_SIDE);
+  // 미리보기는 실제 도안 폭으로 그린다.
+  //
+  // 글자에 딱 맞춘 폭으로 그리면 좌·가운데·우 정렬이 전부 똑같아 보인다
+  // — 글자밖에 없으니 밀 자리가 없다. 도안이 글자보다 좁으면 적용할 때
+  // 어차피 키울 것이므로, 그 키운 크기로 미리 보여준다.
+  const cols = Math.min(Math.max(m.cols, state.pattern.cols), MAX_SIDE);
+  const rows = Math.min(Math.max(m.rows, state.pattern.rows), MAX_SIDE);
   const preview = new Pattern(cols, rows);
   renderText(preview, text, state.text);
 

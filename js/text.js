@@ -31,10 +31,15 @@ const FONT_PX = 12;
 export const GLYPH_HEIGHT = 11;
 
 /**
- * 이진화 기준. 외곽선을 그리며 생긴 흐린 가장자리를 어디까지 칸으로
- * 칠지 정한다. 190은 획이 끊기지 않으면서 번지지도 않는 값이다.
+ * 이진화 기준. 외곽선을 그리며 생긴 흐린 가장자리를 어디까지 칸으로 칠지
+ * 정한다. 실제로 찍어 비교해 128로 정했다:
+ *
+ *   임계 190 — 가장자리를 너무 많이 먹어 획이 2칸으로 굵어진다.
+ *              갈무리 특유의 1칸 획이 뭉개져 다른 글꼴처럼 보인다.
+ *   임계 128 — 폰트에 든 비트맵과 가장 가깝다. ← 이걸 쓴다
+ *   임계 100 이하 — 흐린 부분을 버려 획이 끊긴다.
  */
-const INK_THRESHOLD = 190;
+const INK_THRESHOLD = 128;
 
 /**
  * 이름에 TEXT_를 붙인 이유: 빌드가 모듈들을 한 스코프로 합치므로
@@ -44,6 +49,7 @@ const INK_THRESHOLD = 190;
 export const TEXT_DEFAULTS = {
   letterSpacing: 1,
   lineSpacing: 1,
+  align: 'center',        // 'left' | 'center' | 'right'
 };
 
 let scratch = null;
@@ -188,19 +194,27 @@ export function measureText(text, options) {
  * @param {Pattern} into 찍어 넣을 도안 (그대로 바뀐다)
  */
 export function renderText(into, text, options) {
-  const { letterSpacing, lineSpacing } = { ...TEXT_DEFAULTS, ...options };
+  const { letterSpacing, lineSpacing, align } = { ...TEXT_DEFAULTS, ...options };
   const lines = text.split('\n');
   const size = measureText(text, { letterSpacing, lineSpacing });
 
-  // 가운데 정렬. 처음부터 가운데 있는 편이 손이 덜 간다
-  // (자리를 옮기고 싶으면 전체 이동 기능이 있다).
+  // 세로는 늘 가운데. 위아래 정렬까지 두면 고를 것만 늘고,
+  // 자리를 옮기고 싶으면 전체 이동(◀▲▼▶)이 이미 있다.
   const originY = Math.floor((into.rows - size.rows) / 2);
+
+  // 여러 줄일 때 정렬은 "가장 긴 줄"이 아니라 도안 전체를 기준으로 잡는다.
+  // 그래야 왼쪽 정렬한 줄들의 시작점이 서로 어긋나지 않는다.
+  const startX = (w) => {
+    if (align === 'left') return 0;
+    if (align === 'right') return into.cols - w;
+    return Math.floor((into.cols - w) / 2);
+  };
 
   lines.forEach((line, li) => {
     const g = rasterLine(line, letterSpacing);
     if (!g.w) return;
 
-    const cx = Math.floor((into.cols - g.w) / 2);
+    const cx = startX(g.w);
     const cy = originY + li * (GLYPH_HEIGHT + lineSpacing);
 
     for (let y = 0; y < g.h; y++) {

@@ -339,6 +339,21 @@ input[type="number"] {
 }
 
 .warn { color: var(--erase); }
+
+.field-label { color: var(--muted); }
+.align-row { gap: 4px; }
+.align {
+  min-width: 34px;
+  font-size: 15px;
+  line-height: 1;
+  padding: 6px 8px;
+  color: var(--muted);
+}
+.align[aria-pressed="true"] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--ink);
+}
 .panel-section h2 {
   margin: 0 0 8px;
   font-size: 12px;
