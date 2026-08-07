@@ -1,8 +1,6 @@
 import { Pattern, OPEN, FILLED, MAX_SIDE, clamp } from './pattern.js';
 import { loadImageFile, toPattern, DEFAULT_OPTIONS } from './image.js';
-import {
-  measureText, renderText, ensureFontLoaded, fontReady,
-} from './text.js';
+import { measureText, renderText, missingChars } from './text.js';
 import { draw, hitTest, canvasSize } from './renderer.js';
 import { buildReading, readingToHTML } from './reading.js';
 import { History } from './history.js';
@@ -782,15 +780,7 @@ function bindTextTab() {
   }
   $('btn-text-apply').addEventListener('click', applyText);
 
-  // 글꼴을 미리 받아둔다. 준비되면 그동안 잰 글리프를 버리고 다시 그린다.
-  ensureFontLoaded().then((ok) => {
-    fontFailed = !ok;
-    renderTextPreview();
-  });
 }
-
-/** 글꼴을 끝내 못 받았는지. 안내 문구를 바꾸는 데만 쓴다. */
-let fontFailed = false;
 
 /** 지금 입력과 설정으로 잰 크기. */
 function currentTextMeasure() {
@@ -815,30 +805,21 @@ function renderTextPreview() {
     return;
   }
 
-  // 글꼴이 아직 안 왔으면 그리지 않는다.
-  //
-  // `font-display: block`은 글꼴을 기다리는 동안 글자를 투명하게 그린다.
-  // 그 상태로 찍으면 잉크가 하나도 없어 글자 폭이 0이 되고, 미리보기가
-  // 빈 화면이 된다 — 고장난 것처럼 보인다. 준비되면 다시 부른다.
-  if (!fontReady()) {
-    canvasEl.width = canvasEl.height = 0;
-    info.textContent = fontFailed
-      ? '글꼴을 불러오지 못했습니다. 새로고침해 보세요.'
-      : '글꼴을 불러오는 중입니다…';
-    warn.hidden = true;
-    $('btn-text-apply').disabled = true;
-    return;
-  }
-
   const m = currentTextMeasure();
   info.textContent = `필요한 크기: ${m.cols} × ${m.rows}칸 (현재 도안 ${state.pattern.cols} × ${state.pattern.rows})`;
 
   // 상한을 넘으면 어느 쪽이 넘쳤는지 구분해 알려준다.
   // 줄바꿈하면 세로가 먼저 걸리므로 두 축을 따로 봐야 한다.
+  const absent = missingChars(text);
   if (m.overflowX || m.overflowY) {
     warn.hidden = false;
     warn.textContent = overflowMessage(m);
     $('btn-text-apply').disabled = true;
+  } else if (absent.length) {
+    // 글꼴에 없는 글자는 빈칸으로 찍힌다. 왜 안 나오는지 알려준다.
+    warn.hidden = false;
+    warn.textContent = `글꼴에 없는 글자: ${absent.join(' ')} — 빈칸으로 들어갑니다.`;
+    $('btn-text-apply').disabled = false;
   } else {
     warn.hidden = true;
     $('btn-text-apply').disabled = false;

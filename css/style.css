@@ -1,14 +1,9 @@
-/* 갈무리Mono9 — quiple(이민서) 제작, SIL OFL 1.1.
-   https://github.com/quiple/galmuri
-   CDN을 쓰지 않고 파일을 직접 두는 이유: 이 앱은 index.html을 그냥
-   더블클릭해도 동작해야 하고, 외부 서버가 느리면 글자가 깨진다.
-   block으로 두어 글꼴이 준비되기 전에 대체 글꼴로 찍히는 것을 막는다 —
-   도안은 픽셀이 그대로 칸이 되므로 다른 글꼴로 찍히면 결과가 어긋난다. */
-@font-face {
-  font-family: 'GalmuriMono9';
-  src: url('../fonts/GalmuriMono9.woff2') format('woff2');
-  font-display: block;
-}
+/* 갈무리Mono9 웹폰트는 더 이상 불러오지 않는다.
+   글자 모양을 브라우저에 그려달라고 하면 기기마다(PC의 DirectWrite,
+   폰의 CoreText) 결과가 달라 같은 글자도 도안이 어긋났다. 지금은 폰트에
+   든 비트맵을 빌드할 때 미리 꺼내 js/glyphs.js에 담아 쓴다.
+   폰트 파일과 라이선스는 fonts/에 그대로 둔다 — glyphs.js의 출처이고,
+   OFL이 라이선스 사본 동봉을 요구한다. */
 
 :root {
   --bg: #f6f5f2;
