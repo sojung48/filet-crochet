@@ -1,6 +1,8 @@
 import { Pattern, OPEN, FILLED, MAX_SIDE, clamp } from './pattern.js';
 import { loadImageFile, toPattern, DEFAULT_OPTIONS } from './image.js';
-import { measureText, renderText, missingChars } from './text.js';
+import {
+  measureText, renderText, missingChars, fontList, TEXT_DEFAULT_FONT,
+} from './text.js';
 import { draw, hitTest, canvasSize } from './renderer.js';
 import { buildReading, readingToHTML } from './reading.js';
 import { History } from './history.js';
@@ -33,7 +35,7 @@ const state = {
   tab: 'pattern',
   // 이미지 탭. source는 세션 동안만 살아 있고 저장하지 않는다.
   image: { source: null, options: { ...DEFAULT_OPTIONS } },
-  text: { letterSpacing: 1, lineSpacing: 1, align: 'center' },
+  text: { letterSpacing: 1, lineSpacing: 1, align: 'center', font: TEXT_DEFAULT_FONT },
   // 진행 중인 스트로크
   stroke: null,
   dirty: false,
@@ -52,6 +54,8 @@ function init() {
     if (savedView.tool) state.tool = savedView.tool;
     // 저장된 이름이 지금 없는 탭일 수도 있다(탭 이름을 바꾼 뒤 옛 설정을 읽는 경우)
     if (TABS.includes(savedView.tab)) state.tab = savedView.tab;
+    // 글꼴 이름이 바뀌었을 수 있다 — text.js가 모르는 이름은 기본값으로 되돌린다
+    if (savedView.text) Object.assign(state.text, savedView.text);
   }
 
   const saved = loadPattern();
@@ -97,6 +101,7 @@ function syncControlsFromState() {
 
   $('in-letter-gap').value = state.text.letterSpacing;
   $('in-line-gap').value = state.text.lineSpacing;
+  $('in-font').value = state.text.font;
   for (const btn of document.querySelectorAll('.align')) {
     btn.setAttribute('aria-pressed', String(btn.dataset.align === state.text.align));
   }
@@ -768,13 +773,29 @@ function bindTextTab() {
   for (const [id, key] of [['in-letter-gap', 'letterSpacing'], ['in-line-gap', 'lineSpacing']]) {
     $(id).addEventListener('input', (e) => {
       state.text[key] = clamp(parseInt(e.target.value, 10) || 0, 0, 9);
+      persistView();
       renderTextPreview();
     });
   }
+  // 글꼴 목록. 칸 수를 함께 보여준다 — 도안에서는 그게 실제로 중요하다.
+  const sel = $('in-font');
+  for (const f of fontList()) {
+    const opt = document.createElement('option');
+    opt.value = f.key;
+    opt.textContent = `${f.label} — 한글 ${f.hangul}칸, 높이 ${f.height}칸`;
+    sel.append(opt);
+  }
+  sel.addEventListener('change', (e) => {
+    state.text.font = e.target.value;
+    persistView();
+    renderTextPreview();
+  });
+
   for (const btn of document.querySelectorAll('.align')) {
     btn.addEventListener('click', () => {
       state.text.align = btn.dataset.align;
       syncControlsFromState();
+      persistView();
       renderTextPreview();
     });
   }
@@ -810,7 +831,7 @@ function renderTextPreview() {
 
   // 상한을 넘으면 어느 쪽이 넘쳤는지 구분해 알려준다.
   // 줄바꿈하면 세로가 먼저 걸리므로 두 축을 따로 봐야 한다.
-  const absent = missingChars(text);
+  const absent = missingChars(text, state.text.font);
   if (m.overflowX || m.overflowY) {
     warn.hidden = false;
     warn.textContent = overflowMessage(m);
@@ -930,7 +951,10 @@ function bindKeyboard() {
 // ---------------------------------------------------------------- 잡다
 
 function persistView() {
-  saveView({ view: state.view, cell: state.cell, tool: state.tool, tab: state.tab });
+  saveView({
+    view: state.view, cell: state.cell, tool: state.tool,
+    tab: state.tab, text: state.text,
+  });
 }
 
 function setSaveHint(iso) {

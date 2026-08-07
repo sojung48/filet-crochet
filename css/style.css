@@ -336,6 +336,17 @@ input[type="number"] {
 .warn { color: var(--erase); }
 
 .field-label { color: var(--muted); }
+
+/* 글꼴 이름이 길어 칸을 가로로 꽉 채운다 */
+.wide-label { width: 100%; }
+.wide-label select {
+  flex: 1;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 5px 7px;
+}
 .align-row { gap: 4px; }
 .align {
   min-width: 34px;

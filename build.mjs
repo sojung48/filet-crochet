@@ -105,6 +105,22 @@ if (missing.length) {
   process.exit(1);
 }
 
+// 떼지 못한 import/export가 남았는지 검사.
+//
+// strip은 `export const/function/...` 형태만 떼어낸다. `export { A };` 처럼
+// 다시 내보내는 형태는 그대로 남아, 일반 스크립트로 실행할 때 문법 오류가
+// 난다 — 페이지 전체가 죽는데 빌드는 조용히 끝난다.
+const leftover = [];
+out.split('\n').forEach((line, i) => {
+  if (/^\s*(export|import)\s/.test(line)) leftover.push(`${i + 1}행:  ${line.trim()}`);
+});
+if (leftover.length) {
+  console.error('오류: 번들에 import/export가 남았습니다 — 일반 스크립트에서 문법 오류가 됩니다.');
+  for (const l of leftover) console.error('  ' + l);
+  console.error('  → `export { A };` 대신 `export const A = ...` 형태로 쓰세요.');
+  process.exit(1);
+}
+
 writeFileSync(join(root, 'js', 'bundle.js'), out, 'utf8');
 
 // 캐시 무력화.

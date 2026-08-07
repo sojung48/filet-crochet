@@ -10,18 +10,32 @@
  * 자르냐에 따라 칸 하나가 갈렸다. 같은 글자를 넣어도 PC와 폰에서
  * 도안이 어긋났다. 표를 쓰면 어디서든 똑같이 나온다.
  *
- * 크기 (폰트 원본 그대로):
- *   한글  9칸 폭, 영문·숫자 5칸 폭, 한 줄 11칸 높이
+ * 글꼴은 여러 개 중에 고를 수 있다. 도안에서 중요한 건 글자가 몇 칸을
+ * 차지하느냐이므로, 고를 때 칸 수를 함께 보여준다.
+ *   갈무리7      한글 7칸 · 높이 8칸    ← 가장 작다
+ *   갈무리Mono7  한글 8칸 · 높이 9칸
+ *   갈무리Mono9  한글 9칸 · 높이 11칸   ← 기본
+ *   갈무리11     한글 11칸 · 높이 13칸
  */
 
 import { Pattern, FILLED, MAX_SIDE } from './pattern.js';
-import { GLYPH_DATA, GLYPH_HEIGHT_PX } from './glyphs.js';
+import { FONTS, DEFAULT_FONT } from './glyphs.js';
 
-/** 한 줄이 차지하는 높이(칸). 글리프 표에서 가져온다. */
-export const GLYPH_HEIGHT = GLYPH_HEIGHT_PX;
+/** 고를 수 있는 글꼴들. 화면에 목록을 만들 때 쓴다. */
+export function fontList() {
+  return Object.entries(FONTS).map(([key, f]) => ({
+    key,
+    label: f.label,
+    hangul: f.hangul,
+    latin: f.latin,
+    height: f.height,
+  }));
+}
 
-/** 글꼴에 없는 글자를 대신할 폭. 공백도 이 값을 쓴다. */
-const SPACE_WIDTH = 5;
+// DEFAULT_FONT는 glyphs.js에서 가져와 그대로 다시 내보낸다.
+// `export { DEFAULT_FONT }` 형태로 쓰면 빌드가 export를 떼지 못해
+// 번들에 그대로 남고, 일반 스크립트에서 문법 오류가 난다.
+export const TEXT_DEFAULT_FONT = DEFAULT_FONT;
 
 /**
  * 이름에 TEXT_를 붙인 이유: 빌드가 모듈들을 한 스코프로 합치므로
@@ -32,7 +46,18 @@ export const TEXT_DEFAULTS = {
   letterSpacing: 1,
   lineSpacing: 1,
   align: 'center',        // 'left' | 'center' | 'right'
+  font: DEFAULT_FONT,
 };
+
+/** 이름이 잘못됐을 때 기본 글꼴로 되돌린다 (옛 설정을 읽는 경우). */
+function fontOf(key) {
+  return FONTS[key] ?? FONTS[DEFAULT_FONT];
+}
+
+/** 이 글꼴에서 한 줄이 차지하는 높이(칸). */
+export function glyphHeight(fontKey) {
+  return fontOf(fontKey).height;
+}
 
 /**
  * 코드포인트 → { w, rows } 표.
@@ -40,49 +65,55 @@ export const TEXT_DEFAULTS = {
  * glyphs.js는 자리를 아끼려고 폭별로 묶고 코드포인트를 차이로 적어 두었다.
  * 처음 쓸 때 한 번만 펴서 Map으로 만든다(1만 자가 넘어 매번 훑을 수 없다).
  */
-let table = null;
+const tables = new Map();
 
-function glyphTable() {
-  if (table) return table;
-  table = new Map();
-  for (const [wStr, [deltas, hex]] of Object.entries(GLYPH_DATA)) {
+function glyphTable(fontKey) {
+  const key = FONTS[fontKey] ? fontKey : DEFAULT_FONT;
+  const hit = tables.get(key);
+  if (hit) return hit;
+
+  const font = FONTS[key];
+  const table = new Map();
+  for (const [wStr, [deltas, hex]] of Object.entries(font.data)) {
     const w = Number(wStr);
     const per = Math.ceil(w / 4);
-    const stride = per * GLYPH_HEIGHT_PX;
+    const stride = per * font.height;
     let cp = 0;
     deltas.split(',').forEach((d, i) => {
       cp += parseInt(d, 36);
       const at = i * stride;
-      const rows = new Uint32Array(GLYPH_HEIGHT_PX);
-      for (let y = 0; y < GLYPH_HEIGHT_PX; y++) {
+      const rows = new Uint32Array(font.height);
+      for (let y = 0; y < font.height; y++) {
         rows[y] = parseInt(hex.slice(at + y * per, at + (y + 1) * per), 16);
       }
       table.set(cp, { w, rows });
     });
   }
+  tables.set(key, table);
   return table;
 }
 
 /** 글자 하나의 모양. 글꼴에 없으면 null. */
-function glyphOf(ch) {
-  return glyphTable().get(ch.codePointAt(0)) ?? null;
+function glyphOf(ch, fontKey) {
+  return glyphTable(fontKey).get(ch.codePointAt(0)) ?? null;
 }
 
 /** 글자 하나가 차지하는 가로 칸 수. */
-export function widthOf(ch) {
-  return glyphOf(ch)?.w ?? SPACE_WIDTH;
+export function widthOf(ch, fontKey) {
+  // 공백은 글리프가 없다 — 이 글꼴의 영문 폭을 쓴다
+  return glyphOf(ch, fontKey)?.w ?? fontOf(fontKey).latin;
 }
 
 /** 이 글자를 도안에 넣을 수 있는지. 없는 글자는 안내에 쓴다. */
-export function hasGlyph(ch) {
-  return ch === ' ' || glyphTable().has(ch.codePointAt(0));
+export function hasGlyph(ch, fontKey) {
+  return ch === ' ' || glyphTable(fontKey).has(ch.codePointAt(0));
 }
 
 /** 글꼴에 없어 빈칸으로 나올 글자들. 중복은 지운다. */
-export function missingChars(text) {
+export function missingChars(text, fontKey) {
   const out = [];
   for (const ch of text) {
-    if (ch === '\n' || ch === ' ' || hasGlyph(ch)) continue;
+    if (ch === '\n' || ch === ' ' || hasGlyph(ch, fontKey)) continue;
     if (!out.includes(ch)) out.push(ch);
   }
   return out;
@@ -97,20 +128,21 @@ export function missingChars(text) {
  * @returns {{ cols, rows, lines, overflowX, overflowY }}
  */
 export function measureText(text, options) {
-  const { letterSpacing, lineSpacing } = { ...TEXT_DEFAULTS, ...options };
+  const { letterSpacing, lineSpacing, font } = { ...TEXT_DEFAULTS, ...options };
   const lines = text.split('\n');
+  const height = glyphHeight(font);
 
   let cols = 0;
   for (const line of lines) {
     const chars = [...line];
     if (!chars.length) continue;
     let w = 0;
-    for (const ch of chars) w += widthOf(ch);
+    for (const ch of chars) w += widthOf(ch, font);
     w += letterSpacing * (chars.length - 1);
     cols = Math.max(cols, w);
   }
 
-  const rows = lines.length * GLYPH_HEIGHT + lineSpacing * (lines.length - 1);
+  const rows = lines.length * height + lineSpacing * (lines.length - 1);
 
   return {
     cols,
@@ -130,9 +162,10 @@ export function measureText(text, options) {
  * @param {Pattern} into 찍어 넣을 도안 (그대로 바뀐다)
  */
 export function renderText(into, text, options) {
-  const { letterSpacing, lineSpacing, align } = { ...TEXT_DEFAULTS, ...options };
+  const { letterSpacing, lineSpacing, align, font } = { ...TEXT_DEFAULTS, ...options };
   const lines = text.split('\n');
-  const size = measureText(text, { letterSpacing, lineSpacing });
+  const size = measureText(text, { letterSpacing, lineSpacing, font });
+  const height = glyphHeight(font);
 
   // 세로는 늘 가운데. 위아래 정렬까지 두면 고를 것만 늘고,
   // 자리를 옮기고 싶으면 전체 이동(◀▲▼▶)이 이미 있다.
@@ -151,16 +184,16 @@ export function renderText(into, text, options) {
     if (!chars.length) return;
 
     let lineW = 0;
-    for (const ch of chars) lineW += widthOf(ch);
+    for (const ch of chars) lineW += widthOf(ch, font);
     lineW += letterSpacing * (chars.length - 1);
 
     let cx = startX(lineW);
-    const cy = originY + li * (GLYPH_HEIGHT + lineSpacing);
+    const cy = originY + li * (height + lineSpacing);
 
     for (const ch of chars) {
-      const g = glyphOf(ch);
+      const g = glyphOf(ch, font);
       if (g) {
-        for (let y = 0; y < GLYPH_HEIGHT; y++) {
+        for (let y = 0; y < height; y++) {
           const bits = g.rows[y];
           if (!bits) continue;
           for (let x = 0; x < g.w; x++) {
@@ -168,7 +201,7 @@ export function renderText(into, text, options) {
           }
         }
       }
-      cx += widthOf(ch) + letterSpacing;
+      cx += widthOf(ch, font) + letterSpacing;
     }
   });
 }
