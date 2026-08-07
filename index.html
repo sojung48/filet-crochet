@@ -195,11 +195,17 @@
         <div class="field-row" id="row-line-gap">
           <label>줄 간격 <input type="number" id="in-line-gap" min="0" max="9" value="1"></label>
         </div>
-        <div class="field-row align-row" role="group" aria-label="정렬">
-          <span class="field-label">정렬</span>
-          <button type="button" class="align" data-align="left" aria-pressed="false" title="왼쪽 정렬">◧</button>
-          <button type="button" class="align" data-align="center" aria-pressed="true" title="가운데 정렬">▣</button>
-          <button type="button" class="align" data-align="right" aria-pressed="false" title="오른쪽 정렬">◨</button>
+        <div class="field-row align-row" role="group" aria-label="가로 정렬">
+          <span class="field-label">가로</span>
+          <button type="button" class="align" data-align="left" aria-pressed="false" title="왼쪽">◧</button>
+          <button type="button" class="align" data-align="center" aria-pressed="true" title="가운데">▣</button>
+          <button type="button" class="align" data-align="right" aria-pressed="false" title="오른쪽">◨</button>
+        </div>
+        <div class="field-row align-row" role="group" aria-label="세로 정렬">
+          <span class="field-label">세로</span>
+          <button type="button" class="valign" data-valign="top" aria-pressed="false" title="위">⬒</button>
+          <button type="button" class="valign" data-valign="middle" aria-pressed="true" title="가운데">▣</button>
+          <button type="button" class="valign" data-valign="bottom" aria-pressed="false" title="아래">⬓</button>
         </div>
       </section>
 
@@ -238,6 +244,6 @@
 
 <!-- 번들(일반 스크립트)이라 index.html을 그냥 더블클릭해도 동작한다.
      원본은 js/*.js 이고, 수정 후에는 "node build.mjs"로 다시 만든다. -->
-<script defer src="js/bundle.js?v=3a73af8d"></script>
+<script defer src="js/bundle.js?v=1bf87644"></script>
 </body>
 </html>

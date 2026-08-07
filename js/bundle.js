@@ -900,7 +900,8 @@ const DEFAULT_FONT = 'gm9';
  */const TEXT_DEFAULTS = {
   letterSpacing: 1,
   lineSpacing: 1,
-  align: 'center',        // 'left' | 'center' | 'right'
+  align: 'center',        // 가로: 'left' | 'center' | 'right'
+  valign: 'middle',       // 세로: 'top' | 'middle' | 'bottom'
   font: DEFAULT_FONT,
 };
 
@@ -1011,14 +1012,17 @@ function glyphOf(ch, fontKey) {
  *
  * @param {Pattern} into 찍어 넣을 도안 (그대로 바뀐다)
  */function renderText(into, text, options) {
-  const { letterSpacing, lineSpacing, align, font } = { ...TEXT_DEFAULTS, ...options };
+  const {
+    letterSpacing, lineSpacing, align, valign, font,
+  } = { ...TEXT_DEFAULTS, ...options };
   const lines = text.split('\n');
   const size = measureText(text, { letterSpacing, lineSpacing, font });
   const height = glyphHeight(font);
 
-  // 세로는 늘 가운데. 위아래 정렬까지 두면 고를 것만 늘고,
-  // 자리를 옮기고 싶으면 전체 이동(◀▲▼▶)이 이미 있다.
-  const originY = Math.floor((into.rows - size.rows) / 2);
+  // 세로 자리. 가로와 같은 규칙으로 잡는다.
+  const originY = valign === 'top' ? 0
+    : valign === 'bottom' ? into.rows - size.rows
+    : Math.floor((into.rows - size.rows) / 2);
 
   // 여러 줄일 때 정렬은 "가장 긴 줄"이 아니라 도안 전체를 기준으로 잡는다.
   // 그래야 왼쪽 정렬한 줄들의 시작점이 서로 어긋나지 않는다.
@@ -1095,7 +1099,10 @@ const state = {
   tab: 'pattern',
   // 이미지 탭. source는 세션 동안만 살아 있고 저장하지 않는다.
   image: { source: null, options: { ...DEFAULT_OPTIONS } },
-  text: { letterSpacing: 1, lineSpacing: 1, align: 'center', font: TEXT_DEFAULT_FONT },
+  text: {
+    letterSpacing: 1, lineSpacing: 1,
+    align: 'center', valign: 'middle', font: TEXT_DEFAULT_FONT,
+  },
   // 진행 중인 스트로크
   stroke: null,
   dirty: false,
@@ -1164,6 +1171,9 @@ function syncControlsFromState() {
   $('in-font').value = state.text.font;
   for (const btn of document.querySelectorAll('.align')) {
     btn.setAttribute('aria-pressed', String(btn.dataset.align === state.text.align));
+  }
+  for (const btn of document.querySelectorAll('.valign')) {
+    btn.setAttribute('aria-pressed', String(btn.dataset.valign === state.text.valign));
   }
 }
 
@@ -1851,13 +1861,15 @@ function bindTextTab() {
     renderTextPreview();
   });
 
-  for (const btn of document.querySelectorAll('.align')) {
-    btn.addEventListener('click', () => {
-      state.text.align = btn.dataset.align;
-      syncControlsFromState();
-      persistView();
-      renderTextPreview();
-    });
+  for (const [cls, key] of [['align', 'align'], ['valign', 'valign']]) {
+    for (const btn of document.querySelectorAll(`.${cls}`)) {
+      btn.addEventListener('click', () => {
+        state.text[key] = btn.dataset[key];
+        syncControlsFromState();
+        persistView();
+        renderTextPreview();
+      });
+    }
   }
   $('btn-text-apply').addEventListener('click', applyText);
 

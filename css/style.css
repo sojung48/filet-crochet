@@ -348,14 +348,16 @@ input[type="number"] {
   padding: 5px 7px;
 }
 .align-row { gap: 4px; }
-.align {
+.align, .valign {
   min-width: 34px;
   font-size: 15px;
   line-height: 1;
   padding: 6px 8px;
   color: var(--muted);
 }
-.align[aria-pressed="true"] {
+/* 가로·세로 라벨 폭을 맞춰 두 줄의 버튼이 세로로 나란히 서게 한다 */
+.align-row .field-label { min-width: 30px; }
+.align[aria-pressed="true"], .valign[aria-pressed="true"] {
   background: var(--accent-soft);
   border-color: var(--accent);
   color: var(--ink);

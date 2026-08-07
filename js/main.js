@@ -35,7 +35,10 @@ const state = {
   tab: 'pattern',
   // 이미지 탭. source는 세션 동안만 살아 있고 저장하지 않는다.
   image: { source: null, options: { ...DEFAULT_OPTIONS } },
-  text: { letterSpacing: 1, lineSpacing: 1, align: 'center', font: TEXT_DEFAULT_FONT },
+  text: {
+    letterSpacing: 1, lineSpacing: 1,
+    align: 'center', valign: 'middle', font: TEXT_DEFAULT_FONT,
+  },
   // 진행 중인 스트로크
   stroke: null,
   dirty: false,
@@ -104,6 +107,9 @@ function syncControlsFromState() {
   $('in-font').value = state.text.font;
   for (const btn of document.querySelectorAll('.align')) {
     btn.setAttribute('aria-pressed', String(btn.dataset.align === state.text.align));
+  }
+  for (const btn of document.querySelectorAll('.valign')) {
+    btn.setAttribute('aria-pressed', String(btn.dataset.valign === state.text.valign));
   }
 }
 
@@ -791,13 +797,15 @@ function bindTextTab() {
     renderTextPreview();
   });
 
-  for (const btn of document.querySelectorAll('.align')) {
-    btn.addEventListener('click', () => {
-      state.text.align = btn.dataset.align;
-      syncControlsFromState();
-      persistView();
-      renderTextPreview();
-    });
+  for (const [cls, key] of [['align', 'align'], ['valign', 'valign']]) {
+    for (const btn of document.querySelectorAll(`.${cls}`)) {
+      btn.addEventListener('click', () => {
+        state.text[key] = btn.dataset[key];
+        syncControlsFromState();
+        persistView();
+        renderTextPreview();
+      });
+    }
   }
   $('btn-text-apply').addEventListener('click', applyText);
 
