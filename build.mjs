@@ -16,7 +16,7 @@ import { dirname, join } from 'node:path';
 const root = dirname(fileURLToPath(import.meta.url));
 
 // 의존 순서대로. main은 나머지를 모두 쓰므로 마지막.
-const FILES = ['pattern.js', 'renderer.js', 'reading.js', 'history.js', 'storage.js', 'image.js', 'main.js'];
+const FILES = ['pattern.js', 'renderer.js', 'reading.js', 'history.js', 'storage.js', 'image.js', 'text.js', 'main.js'];
 
 const strip = (src) => src
   // import 문 제거 (같은 스코프에 합쳐지므로 불필요)
@@ -29,6 +29,27 @@ const parts = FILES.map((f) => {
   const src = readFileSync(join(root, 'js', f), 'utf8');
   return `// ===== js/${f} =====\n${strip(src).trim()}\n`;
 });
+
+// 이름 충돌 검사.
+//
+// 모듈들이 한 스코프로 합쳐지므로, 두 파일이 같은 이름을 최상위에 선언하면
+// 뒤엣것이 앞엣것을 조용히 덮어쓴다. ES 모듈로 열어볼 때는 멀쩡해서
+// 눈치채기 어렵다(실제로 image.js와 text.js가 toPattern으로 겹쳤다).
+const seen = new Map();
+const dupes = [];
+FILES.forEach((f, i) => {
+  const decl = /^(?:const|let|var|function|class|async function)\s+([A-Za-z_$][\w$]*)/gm;
+  for (const m of parts[i].matchAll(decl)) {
+    const name = m[1];
+    if (seen.has(name)) dupes.push(`${name}  (js/${seen.get(name)} ↔ js/${f})`);
+    else seen.set(name, f);
+  }
+});
+if (dupes.length) {
+  console.error('오류: 최상위 이름이 겹칩니다 — 뒤엣것이 앞엣것을 덮어씁니다.');
+  for (const d of dupes) console.error('  ' + d);
+  process.exit(1);
+}
 
 const out = `/* 자동 생성 파일 — 편집하지 말 것. 원본은 js/*.js, 재생성은 "node build.mjs" */
 (function () {

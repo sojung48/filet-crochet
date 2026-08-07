@@ -1,5 +1,9 @@
-import { Pattern, OPEN, FILLED, MAX_SIDE } from './pattern.js';
+import { Pattern, OPEN, FILLED, MAX_SIDE, clamp } from './pattern.js';
 import { loadImageFile, toPattern, DEFAULT_OPTIONS } from './image.js';
+import {
+  measure as measureText, renderTextInto as renderText,
+  ensureFontLoaded, clearGlyphCache,
+} from './text.js';
 import { draw, hitTest, canvasSize } from './renderer.js';
 import { buildReading, readingToHTML } from './reading.js';
 import { History } from './history.js';
@@ -32,6 +36,7 @@ const state = {
   tab: 'pattern',
   // 이미지 탭. source는 세션 동안만 살아 있고 저장하지 않는다.
   image: { source: null, options: { ...DEFAULT_OPTIONS } },
+  text: { letterSpacing: 1, lineSpacing: 1 },
   // 진행 중인 스트로크
   stroke: null,
   dirty: false,
@@ -92,6 +97,9 @@ function syncControlsFromState() {
   $('opt-img-invert').checked = img.invert;
   $('opt-img-dither').checked = img.dither;
   $('opt-img-contain').checked = img.contain;
+
+  $('in-letter-gap').value = state.text.letterSpacing;
+  $('in-line-gap').value = state.text.lineSpacing;
 }
 
 // ---------------------------------------------------------------- 렌더링
@@ -484,6 +492,7 @@ function redo() {
 function bindPanel() {
   bindTabs();
   bindImageTab();
+  bindTextTab();
   $('btn-resize').addEventListener('click', applyResize);
   for (const id of ['in-cols', 'in-rows']) {
     $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') applyResize(); });
@@ -595,6 +604,8 @@ function applyResize() {
     renderImagePreview();
     if (state.tab === 'image') toast('새 크기로 다시 변환했습니다. [도안에 적용]을 누르세요.');
   }
+  // 안내문이 "현재 도안 N × M"을 담고 있어 크기가 바뀌면 함께 갱신해야 한다
+  if ($('in-text').value) renderTextPreview();
 }
 
 function losesFilledCells(p, cols, rows) {
@@ -750,6 +761,125 @@ function clearImage() {
   toast('불러온 이미지를 비웠습니다. (도안은 그대로입니다)');
 }
 
+// ---------------------------------------------------------------- 텍스트 탭
+
+function bindTextTab() {
+  $('in-text').addEventListener('input', renderTextPreview);
+  for (const [id, key] of [['in-letter-gap', 'letterSpacing'], ['in-line-gap', 'lineSpacing']]) {
+    $(id).addEventListener('input', (e) => {
+      state.text[key] = clamp(parseInt(e.target.value, 10) || 0, 0, 9);
+      renderTextPreview();
+    });
+  }
+  $('btn-text-apply').addEventListener('click', applyText);
+
+  // 글꼴이 준비되기 전에 찍으면 대체 글꼴로 그려져 결과가 어긋난다.
+  // 준비되면 그동안 잰 글리프를 버리고 다시 그린다.
+  ensureFontLoaded().then((ok) => {
+    clearGlyphCache();
+    if (!ok) toast('글꼴을 불러오지 못했습니다. 글자 모양이 다를 수 있습니다.');
+    if ($('in-text').value) renderTextPreview();
+  });
+}
+
+/** 지금 입력과 설정으로 잰 크기. */
+function currentTextMeasure() {
+  return measureText($('in-text').value, state.text);
+}
+
+function renderTextPreview() {
+  const text = $('in-text').value;
+  const info = $('text-size-info');
+  const warn = $('text-warn');
+  const canvasEl = $('text-preview');
+
+  // 줄이 하나뿐이면 줄 간격은 아무 일도 하지 않는다 — 흐리게 표시한다
+  const multiline = text.includes('\n');
+  $('row-line-gap').classList.toggle('inactive', !multiline);
+
+  if (!text.trim()) {
+    canvasEl.width = canvasEl.height = 0;
+    info.textContent = '글자를 입력하면 크기를 알려 드립니다.';
+    warn.hidden = true;
+    $('btn-text-apply').disabled = true;
+    return;
+  }
+
+  const m = currentTextMeasure();
+  info.textContent = `필요한 크기: ${m.cols} × ${m.rows}칸 (현재 도안 ${state.pattern.cols} × ${state.pattern.rows})`;
+
+  // 상한을 넘으면 어느 쪽이 넘쳤는지 구분해 알려준다.
+  // 줄바꿈하면 세로가 먼저 걸리므로 두 축을 따로 봐야 한다.
+  if (m.overflowX || m.overflowY) {
+    warn.hidden = false;
+    warn.textContent = overflowMessage(m);
+    $('btn-text-apply').disabled = true;
+  } else {
+    warn.hidden = true;
+    $('btn-text-apply').disabled = false;
+  }
+
+  // 미리보기는 넘치더라도 잘라서 보여준다 — 무엇이 문제인지 눈으로 보인다.
+  const cols = Math.min(m.cols, MAX_SIDE);
+  const rows = Math.min(m.rows, MAX_SIDE);
+  const preview = new Pattern(cols, rows);
+  renderText(preview, text, state.text);
+
+  const cell = clamp(Math.floor(260 / Math.max(cols, rows)), 1, 6);
+  canvasEl.width = cols * cell;
+  canvasEl.height = rows * cell;
+  draw(canvasEl.getContext('2d'), preview, {
+    cell, guides: false, numbers: false, symbols: false,
+    colors: {
+      bg: '#ffffff', line: '#ffffff', lineStrong: '#ffffff',
+      filled: '#1a1a1a', text: '#555555',
+    },
+  });
+}
+
+function overflowMessage(m) {
+  const over = [];
+  if (m.overflowX) over.push(`가로 ${m.cols}칸`);
+  if (m.overflowY) over.push(`세로 ${m.rows}칸`);
+  const what = over.join(', ');
+  const how = m.overflowY && m.lines > 1
+    ? '줄 수를 줄이거나 줄 간격을 좁혀 보세요.'
+    : '글자 수를 줄이거나 글자 간격을 좁혀 보세요.';
+  return `${what} — 최대 ${MAX_SIDE}칸을 넘습니다. ${how}`;
+}
+
+function applyText() {
+  const text = $('in-text').value;
+  if (!text.trim()) return;
+
+  const m = currentTextMeasure();
+  if (m.overflowX || m.overflowY) return toast(overflowMessage(m));
+
+  // 도안이 글자보다 작으면 키울지 묻는다. 말없이 잘라내면 왜 글자가
+  // 반만 나왔는지 알 수 없다.
+  const needCols = Math.max(m.cols, state.pattern.cols);
+  const needRows = Math.max(m.rows, state.pattern.rows);
+  const tooSmall = m.cols > state.pattern.cols || m.rows > state.pattern.rows;
+
+  if (tooSmall) {
+    const ok = confirm(
+      `최소 ${m.cols} × ${m.rows}칸이 필요합니다.\n` +
+      `도안 크기를 ${needCols} × ${needRows}칸으로 바꾸시겠습니까?`,
+    );
+    if (!ok) return;
+    state.pattern = state.pattern.resized(needCols, needRows);
+    state.cell = clamp(state.cell, MIN_CELL, maxCellForPattern());
+  }
+
+  // 기존 도안 위에 글자를 얹는다. 통째로 갈아치우지 않으므로
+  // 테두리나 배경을 먼저 그려 두고 글자를 넣을 수 있다.
+  renderText(state.pattern, text, state.text);
+  syncControlsFromState();
+  commit();
+  renderTextPreview();                 // 크기가 바뀌었을 수 있다
+  toast('글자를 도안에 넣었습니다. 되돌리려면 ↶');
+}
+
 // ---------------------------------------------------------------- 키보드
 
 function bindKeyboard() {
@@ -807,10 +937,6 @@ function toast(message) {
   el.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
-}
-
-function clamp(n, lo, hi) {
-  return Math.min(hi, Math.max(lo, n));
 }
 
 init();

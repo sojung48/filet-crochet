@@ -10,6 +10,10 @@
  * 2단계에서 다색 그래프 도안으로 확장할 때 저장 포맷을 그대로 쓰기 위함.
  */const OPEN = 0;const FILLED = 1;
 
+/** 여러 모듈이 함께 쓴다. 가장 먼저 불러오는 파일에 두어야 한다. */function clamp(n, lo, hi) {
+  return Math.min(hi, Math.max(lo, n));
+}
+
 /** 팔레트. 인덱스 순서가 곧 칸 값이다. */const DEFAULT_PALETTE = [
   { name: '비움', css: 'transparent' },
   { name: '채움', css: 'var(--cell-filled)' },
@@ -255,12 +259,7 @@ function clampValue(v, paletteSize) {
 }
 
 // ===== js/renderer.js =====
-/** 격자를 캔버스에 그린다. 화면용과 내보내기용 모두 여기를 쓴다. */
-const GUIDE_EVERY = 10;
-
-function clamp(n, lo, hi) {
-  return Math.min(hi, Math.max(lo, n));
-}
+/** 격자를 캔버스에 그린다. 화면용과 내보내기용 모두 여기를 쓴다. */const GUIDE_EVERY = 10;
 
 /**
  * 번호 여백(눈금자) 두께.
@@ -282,8 +281,7 @@ function gutter(cell, pattern) {
  *   symbols     채운 칸에 × 기호
  *   colors      { bg, line, lineStrong, filled, text }
  *   preview     { x0, y0, x1, y1, value } | null — 사각형 도구 미리보기
- */
-function draw(ctx, pattern, opts) {
+ */function draw(ctx, pattern, opts) {
   const {
     cell, guides, numbers, symbols, colors,
     preview = null,
@@ -410,16 +408,14 @@ function valueAt(pattern, x, y, preview) {
   return pattern.get(x, y);
 }
 
-/** 캔버스 픽셀 좌표 → 칸 좌표. 범위 밖이면 null. */
-function hitTest(pattern, px, py, cell, numbers) {
+/** 캔버스 픽셀 좌표 → 칸 좌표. 범위 밖이면 null. */function hitTest(pattern, px, py, cell, numbers) {
   const pad = numbers ? gutter(cell, pattern) : 0;
   const x = Math.floor((px - pad) / cell);
   const y = Math.floor((py - pad) / cell);
   return pattern.inBounds(x, y) ? { x, y } : null;
 }
 
-/** 주어진 옵션에서 캔버스가 필요로 하는 CSS 픽셀 크기. */
-function canvasSize(pattern, cell, numbers) {
+/** 주어진 옵션에서 캔버스가 필요로 하는 CSS 픽셀 크기. */function canvasSize(pattern, cell, numbers) {
   const pad = numbers ? gutter(cell, pattern) : 0;
   return { width: pad + pattern.cols * cell, height: pad + pattern.rows * cell };
 }
@@ -845,6 +841,229 @@ function spread(buf, cols, rows, x, y, amount) {
   buf[y * cols + x] += amount;
 }
 
+// ===== js/text.js =====
+/**
+ * 텍스트 → 도안 변환.
+ *
+ * GalmuriMono9 비트맵 글꼴을 캔버스에 찍고 픽셀을 그대로 칸으로 옮긴다.
+ * 폰트 파일을 직접 파싱하지 않는 이유: 캔버스는 이미 쓰고 있는 도구고,
+ * cmap·EBLC·EBDT를 손수 읽으면 코드가 몇 배로 커진다.
+ *
+ * ---- 실측으로 확정한 값 (스텝 3) ----
+ *
+ * 이름은 "9"지만 실제로는 12px 비트맵 글꼴이다. 폰트에 박힌 XLFD 이름이
+ * `-GalmuriMono9-Regular-R-Regular--12-12-75-75-c-80-iso10646-1`이고,
+ * 비트맵 스트라이크도 12×12px 하나뿐이다.
+ *
+ * 글리프를 실제로 뜯어 재보니:
+ *   - 한글  9×11 (위아래 한 줄씩은 항상 비어 있음 → 실제 잉크는 9칸)
+ *   - 영문  5×9
+ *   - 전각 10×11
+ *
+ * 그래서 세로는 9칸으로 잘라 쓰고, 가로는 글자마다 실제 폭을 쓴다.
+ * 가로를 9로 고정하면 영문 양옆에 빈 칸이 2칸씩 붙어 띄엄띄엄 보인다.
+ */
+
+/** 글자 한 줄의 높이(칸). 위아래 빈 줄을 걷어낸 실제 잉크 높이. */
+const GLYPH_HEIGHT = 9;
+
+/**
+ * 캔버스에 찍을 때 쓸 글자 크기(px).
+ * 비트맵 글꼴은 설계된 크기에서만 또렷하다 — 어긋나면 뭉개진다.
+ */
+const FONT_PX = 12;
+
+/** 글자 하나를 찍을 임시 캔버스의 여유 공간. */
+const PAD = 8;
+
+/**
+ * 이름에 TEXT_를 붙인 이유: 빌드가 모듈들을 한 스코프로 합치므로
+ * image.js의 DEFAULT_OPTIONS와 이름이 겹치면 뒤엣것이 앞엣것을 덮어쓴다.
+ * ES 모듈로 볼 때는 문제가 없어 눈치채기 어렵다.
+ */
+const TEXT_DEFAULTS = {
+  letterSpacing: 1,
+  lineSpacing: 1,
+};
+
+let scratch = null;
+
+function scratchCtx() {
+  if (!scratch) {
+    const c = document.createElement('canvas');
+    c.width = FONT_PX + PAD * 2;
+    c.height = FONT_PX + PAD * 2;
+    scratch = c.getContext('2d', { willReadFrequently: true });
+  }
+  return scratch;
+}
+
+/** 글리프 비트맵 캐시. 같은 글자를 여러 번 재지 않는다. */
+const glyphCache = new Map();
+
+/**
+ * 글자 하나를 찍어 잉크가 닿은 칸만 뽑아낸다.
+ * @returns {{ w: number, h: number, bits: Uint8Array } | null} 공백이면 null
+ */
+function glyphOf(ch) {
+  const hit = glyphCache.get(ch);
+  if (hit !== undefined) return hit;
+
+  const ctx = scratchCtx();
+  const { width, height } = ctx.canvas;
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, width, height);
+  ctx.fillStyle = '#000';
+  ctx.textBaseline = 'alphabetic';
+  ctx.textAlign = 'left';
+  ctx.font = `${FONT_PX}px GalmuriMono9, monospace`;
+  // 베이스라인을 아래쪽에 두어 받침·아랫부분이 잘리지 않게 한다
+  ctx.fillText(ch, PAD, PAD + FONT_PX);
+
+  const { data } = ctx.getImageData(0, 0, width, height);
+
+  // 잉크가 닿은 범위를 찾는다. 안티에일리어싱이 섞여도 비트맵 글꼴은
+  // 거의 순수한 흑백이라 중간값(128)으로 자르면 원래 픽셀이 나온다.
+  let x0 = width, y0 = height, x1 = -1, y1 = -1;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (data[(y * width + x) * 4] < 128) {
+        if (x < x0) x0 = x;
+        if (x > x1) x1 = x;
+        if (y < y0) y0 = y;
+        if (y > y1) y1 = y;
+      }
+    }
+  }
+
+  if (x1 < 0) {                       // 공백 등 잉크가 없는 글자
+    glyphCache.set(ch, null);
+    return null;
+  }
+
+  const w = x1 - x0 + 1;
+  const h = y1 - y0 + 1;
+  const bits = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      bits[y * w + x] = data[((y + y0) * width + (x + x0)) * 4] < 128 ? 1 : 0;
+    }
+  }
+
+  const glyph = { w, h, bits };
+  glyphCache.set(ch, glyph);
+  return glyph;
+}
+
+/** 공백 한 칸의 폭. 실제로 찍어봐야 알 수 있는 값이 아니라 규칙으로 둔다. */
+const SPACE_WIDTH = 4;
+
+/** 글자 하나가 차지하는 가로 칸 수. */
+function widthOf(ch) {
+  if (ch === ' ') return SPACE_WIDTH;
+  return glyphOf(ch)?.w ?? SPACE_WIDTH;
+}
+
+/**
+ * 텍스트가 필요로 하는 격자 크기.
+ *
+ * 가로는 글자마다 폭이 다르므로 줄마다 더해서 가장 긴 줄을 쓴다.
+ * 세로는 글자 높이가 고정(9칸)이라 줄 수로 곱하면 된다.
+ *
+ * @returns {{ cols, rows, lines, overflowX, overflowY }}
+ */
+function measure(text, options) {
+  const { letterSpacing, lineSpacing } = { ...TEXT_DEFAULTS, ...options };
+  const lines = text.split('\n');
+
+  let cols = 0;
+  for (const line of lines) {
+    const chars = [...line];
+    if (!chars.length) continue;
+    let w = 0;
+    for (const ch of chars) w += widthOf(ch);
+    w += letterSpacing * (chars.length - 1);
+    cols = Math.max(cols, w);
+  }
+
+  const rows = lines.length * GLYPH_HEIGHT + lineSpacing * (lines.length - 1);
+
+  return {
+    cols,
+    rows,
+    lines: lines.length,
+    overflowX: cols > MAX_SIDE,
+    overflowY: rows > MAX_SIDE,
+  };
+}
+
+/**
+ * 텍스트를 도안으로 찍는다.
+ *
+ * 격자보다 글자가 크면 넘치는 부분은 잘린다 — 부르는 쪽에서 measure()로
+ * 미리 확인하고 크기를 맞춰 두는 것을 전제한다.
+ *
+ * @param {Pattern} into 찍어 넣을 도안 (그대로 바뀐다)
+ */
+function renderTextInto(into, text, options) {
+  const { letterSpacing, lineSpacing } = { ...TEXT_DEFAULTS, ...options };
+  const lines = text.split('\n');
+  const size = measure(text, { letterSpacing, lineSpacing });
+
+  // 가운데 정렬. 도안을 만들고 나서 위치를 다듬는 것보다,
+  // 처음부터 가운데 있는 편이 손이 덜 간다(전체 이동 기능도 있다).
+  const originY = Math.floor((into.rows - size.rows) / 2);
+
+  lines.forEach((line, li) => {
+    const chars = [...line];
+    let lineW = 0;
+    for (const ch of chars) lineW += widthOf(ch);
+    lineW += letterSpacing * Math.max(0, chars.length - 1);
+
+    let cx = Math.floor((into.cols - lineW) / 2);
+    const cy = originY + li * (GLYPH_HEIGHT + lineSpacing);
+
+    for (const ch of chars) {
+      const g = ch === ' ' ? null : glyphOf(ch);
+      if (g) {
+        // 글리프가 9칸보다 낮으면(영문 등) 아래를 맞춰 베이스라인을 정렬한다
+        const dy = GLYPH_HEIGHT - g.h;
+        for (let y = 0; y < g.h; y++) {
+          for (let x = 0; x < g.w; x++) {
+            if (g.bits[y * g.w + x]) into.set(cx + x, cy + y + dy, FILLED);
+          }
+        }
+      }
+      cx += widthOf(ch) + letterSpacing;
+    }
+  });
+}
+
+/** 텍스트만으로 새 도안을 만든다 (필요한 크기에 딱 맞춰서). */
+function textToPattern(text, cols, rows, options) {
+  const p = new Pattern(cols, rows);
+  renderTextInto(p, text, options);
+  return p;
+}
+
+/** 글꼴이 실제로 준비됐는지. 준비 전에 찍으면 대체 글꼴이 나온다. */
+async function ensureFontLoaded() {
+  if (!document.fonts?.load) return true;
+  try {
+    await document.fonts.load(`${FONT_PX}px GalmuriMono9`, '안녕A');
+    return document.fonts.check(`${FONT_PX}px GalmuriMono9`);
+  } catch {
+    return false;
+  }
+}
+
+/** 글꼴이 바뀌면 캐시가 헛것이 된다 — 다시 재게 한다. */
+function clearGlyphCache() {
+  glyphCache.clear();
+}
+
 // ===== js/main.js =====
 const $ = (id) => document.getElementById(id);
 
@@ -870,6 +1089,7 @@ const state = {
   tab: 'pattern',
   // 이미지 탭. source는 세션 동안만 살아 있고 저장하지 않는다.
   image: { source: null, options: { ...DEFAULT_OPTIONS } },
+  text: { letterSpacing: 1, lineSpacing: 1 },
   // 진행 중인 스트로크
   stroke: null,
   dirty: false,
@@ -930,6 +1150,9 @@ function syncControlsFromState() {
   $('opt-img-invert').checked = img.invert;
   $('opt-img-dither').checked = img.dither;
   $('opt-img-contain').checked = img.contain;
+
+  $('in-letter-gap').value = state.text.letterSpacing;
+  $('in-line-gap').value = state.text.lineSpacing;
 }
 
 // ---------------------------------------------------------------- 렌더링
@@ -1322,6 +1545,7 @@ function redo() {
 function bindPanel() {
   bindTabs();
   bindImageTab();
+  bindTextTab();
   $('btn-resize').addEventListener('click', applyResize);
   for (const id of ['in-cols', 'in-rows']) {
     $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') applyResize(); });
@@ -1433,6 +1657,8 @@ function applyResize() {
     renderImagePreview();
     if (state.tab === 'image') toast('새 크기로 다시 변환했습니다. [도안에 적용]을 누르세요.');
   }
+  // 안내문이 "현재 도안 N × M"을 담고 있어 크기가 바뀌면 함께 갱신해야 한다
+  if ($('in-text').value) renderTextPreview();
 }
 
 function losesFilledCells(p, cols, rows) {
@@ -1588,6 +1814,125 @@ function clearImage() {
   toast('불러온 이미지를 비웠습니다. (도안은 그대로입니다)');
 }
 
+// ---------------------------------------------------------------- 텍스트 탭
+
+function bindTextTab() {
+  $('in-text').addEventListener('input', renderTextPreview);
+  for (const [id, key] of [['in-letter-gap', 'letterSpacing'], ['in-line-gap', 'lineSpacing']]) {
+    $(id).addEventListener('input', (e) => {
+      state.text[key] = clamp(parseInt(e.target.value, 10) || 0, 0, 9);
+      renderTextPreview();
+    });
+  }
+  $('btn-text-apply').addEventListener('click', applyText);
+
+  // 글꼴이 준비되기 전에 찍으면 대체 글꼴로 그려져 결과가 어긋난다.
+  // 준비되면 그동안 잰 글리프를 버리고 다시 그린다.
+  ensureFontLoaded().then((ok) => {
+    clearGlyphCache();
+    if (!ok) toast('글꼴을 불러오지 못했습니다. 글자 모양이 다를 수 있습니다.');
+    if ($('in-text').value) renderTextPreview();
+  });
+}
+
+/** 지금 입력과 설정으로 잰 크기. */
+function currentTextMeasure() {
+  return measureText($('in-text').value, state.text);
+}
+
+function renderTextPreview() {
+  const text = $('in-text').value;
+  const info = $('text-size-info');
+  const warn = $('text-warn');
+  const canvasEl = $('text-preview');
+
+  // 줄이 하나뿐이면 줄 간격은 아무 일도 하지 않는다 — 흐리게 표시한다
+  const multiline = text.includes('\n');
+  $('row-line-gap').classList.toggle('inactive', !multiline);
+
+  if (!text.trim()) {
+    canvasEl.width = canvasEl.height = 0;
+    info.textContent = '글자를 입력하면 크기를 알려 드립니다.';
+    warn.hidden = true;
+    $('btn-text-apply').disabled = true;
+    return;
+  }
+
+  const m = currentTextMeasure();
+  info.textContent = `필요한 크기: ${m.cols} × ${m.rows}칸 (현재 도안 ${state.pattern.cols} × ${state.pattern.rows})`;
+
+  // 상한을 넘으면 어느 쪽이 넘쳤는지 구분해 알려준다.
+  // 줄바꿈하면 세로가 먼저 걸리므로 두 축을 따로 봐야 한다.
+  if (m.overflowX || m.overflowY) {
+    warn.hidden = false;
+    warn.textContent = overflowMessage(m);
+    $('btn-text-apply').disabled = true;
+  } else {
+    warn.hidden = true;
+    $('btn-text-apply').disabled = false;
+  }
+
+  // 미리보기는 넘치더라도 잘라서 보여준다 — 무엇이 문제인지 눈으로 보인다.
+  const cols = Math.min(m.cols, MAX_SIDE);
+  const rows = Math.min(m.rows, MAX_SIDE);
+  const preview = new Pattern(cols, rows);
+  renderText(preview, text, state.text);
+
+  const cell = clamp(Math.floor(260 / Math.max(cols, rows)), 1, 6);
+  canvasEl.width = cols * cell;
+  canvasEl.height = rows * cell;
+  draw(canvasEl.getContext('2d'), preview, {
+    cell, guides: false, numbers: false, symbols: false,
+    colors: {
+      bg: '#ffffff', line: '#ffffff', lineStrong: '#ffffff',
+      filled: '#1a1a1a', text: '#555555',
+    },
+  });
+}
+
+function overflowMessage(m) {
+  const over = [];
+  if (m.overflowX) over.push(`가로 ${m.cols}칸`);
+  if (m.overflowY) over.push(`세로 ${m.rows}칸`);
+  const what = over.join(', ');
+  const how = m.overflowY && m.lines > 1
+    ? '줄 수를 줄이거나 줄 간격을 좁혀 보세요.'
+    : '글자 수를 줄이거나 글자 간격을 좁혀 보세요.';
+  return `${what} — 최대 ${MAX_SIDE}칸을 넘습니다. ${how}`;
+}
+
+function applyText() {
+  const text = $('in-text').value;
+  if (!text.trim()) return;
+
+  const m = currentTextMeasure();
+  if (m.overflowX || m.overflowY) return toast(overflowMessage(m));
+
+  // 도안이 글자보다 작으면 키울지 묻는다. 말없이 잘라내면 왜 글자가
+  // 반만 나왔는지 알 수 없다.
+  const needCols = Math.max(m.cols, state.pattern.cols);
+  const needRows = Math.max(m.rows, state.pattern.rows);
+  const tooSmall = m.cols > state.pattern.cols || m.rows > state.pattern.rows;
+
+  if (tooSmall) {
+    const ok = confirm(
+      `최소 ${m.cols} × ${m.rows}칸이 필요합니다.\n` +
+      `도안 크기를 ${needCols} × ${needRows}칸으로 바꾸시겠습니까?`,
+    );
+    if (!ok) return;
+    state.pattern = state.pattern.resized(needCols, needRows);
+    state.cell = clamp(state.cell, MIN_CELL, maxCellForPattern());
+  }
+
+  // 기존 도안 위에 글자를 얹는다. 통째로 갈아치우지 않으므로
+  // 테두리나 배경을 먼저 그려 두고 글자를 넣을 수 있다.
+  renderText(state.pattern, text, state.text);
+  syncControlsFromState();
+  commit();
+  renderTextPreview();                 // 크기가 바뀌었을 수 있다
+  toast('글자를 도안에 넣었습니다. 되돌리려면 ↶');
+}
+
 // ---------------------------------------------------------------- 키보드
 
 function bindKeyboard() {
@@ -1645,10 +1990,6 @@ function toast(message) {
   el.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
-}
-
-function clamp(n, lo, hi) {
-  return Math.min(hi, Math.max(lo, n));
 }
 
 init();

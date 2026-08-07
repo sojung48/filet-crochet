@@ -185,7 +185,32 @@
     <div class="tabpanel" role="tabpanel" id="panel-text" aria-labelledby="tab-text" hidden>
       <section class="panel-section">
         <h2>텍스트에서 만들기</h2>
-        <p class="hint todo">준비 중입니다. (스텝 4)</p>
+        <textarea id="in-text" rows="3" placeholder="한글·영문 모두 됩니다.&#10;줄바꿈도 됩니다."></textarea>
+        <div class="field-row">
+          <label>글자 간격 <input type="number" id="in-letter-gap" min="0" max="9" value="1"></label>
+        </div>
+        <div class="field-row" id="row-line-gap">
+          <label>줄 간격 <input type="number" id="in-line-gap" min="0" max="9" value="1"></label>
+        </div>
+      </section>
+
+      <section class="panel-section">
+        <h2>미리보기</h2>
+        <div class="preview-box">
+          <canvas id="text-preview" aria-label="텍스트 미리보기"></canvas>
+        </div>
+        <p class="hint" id="text-size-info">–</p>
+        <p class="hint warn" id="text-warn" hidden></p>
+      </section>
+
+      <section class="panel-section">
+        <div class="field-row">
+          <button type="button" id="btn-text-apply">도안에 적용</button>
+        </div>
+        <p class="hint">
+          글자는 가운데에 놓입니다. 적용 후 이동(◀▲▼▶)으로 옮기거나
+          실행취소(↶)로 되돌릴 수 있습니다.
+        </p>
       </section>
     </div>
 
@@ -204,6 +229,6 @@
 
 <!-- 번들(일반 스크립트)이라 index.html을 그냥 더블클릭해도 동작한다.
      원본은 js/*.js 이고, 수정 후에는 "node build.mjs"로 다시 만든다. -->
-<script defer src="js/bundle.js?v=36785b30"></script>
+<script defer src="js/bundle.js?v=c39395ad"></script>
 </body>
 </html>

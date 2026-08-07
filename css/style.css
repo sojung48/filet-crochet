@@ -1,3 +1,15 @@
+/* 갈무리Mono9 — quiple(이민서) 제작, SIL OFL 1.1.
+   https://github.com/quiple/galmuri
+   CDN을 쓰지 않고 파일을 직접 두는 이유: 이 앱은 index.html을 그냥
+   더블클릭해도 동작해야 하고, 외부 서버가 느리면 글자가 깨진다.
+   block으로 두어 글꼴이 준비되기 전에 대체 글꼴로 찍히는 것을 막는다 —
+   도안은 픽셀이 그대로 칸이 되므로 다른 글꼴로 찍히면 결과가 어긋난다. */
+@font-face {
+  font-family: 'GalmuriMono9';
+  src: url('../fonts/GalmuriMono9.woff2') format('woff2');
+  font-display: block;
+}
+
 :root {
   --bg: #f6f5f2;
   --surface: #ffffff;
@@ -296,6 +308,29 @@ input[type="number"] {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
+
+/* ---------- 텍스트 탭 ---------- */
+
+#in-text {
+  width: 100%;
+  margin-bottom: 8px;
+  padding: 7px 8px;
+  background: var(--surface);
+  color: inherit;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font: inherit;
+  resize: vertical;
+}
+
+/* 줄이 하나뿐이면 줄 간격은 아무 일도 하지 않는다. 칸을 없애면 입력 도중
+   아래 버튼들이 밀려 올라오므로, 자리는 두고 흐리게만 한다. */
+#row-line-gap.inactive {
+  opacity: .45;
+  pointer-events: none;
+}
+
+.warn { color: var(--erase); }
 .panel-section h2 {
   margin: 0 0 8px;
   font-size: 12px;

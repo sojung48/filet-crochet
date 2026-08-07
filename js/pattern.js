@@ -8,6 +8,11 @@
 export const OPEN = 0;
 export const FILLED = 1;
 
+/** 여러 모듈이 함께 쓴다. 가장 먼저 불러오는 파일에 두어야 한다. */
+export function clamp(n, lo, hi) {
+  return Math.min(hi, Math.max(lo, n));
+}
+
 /** 팔레트. 인덱스 순서가 곧 칸 값이다. */
 export const DEFAULT_PALETTE = [
   { name: '비움', css: 'transparent' },

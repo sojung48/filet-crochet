@@ -1,12 +1,8 @@
 /** 격자를 캔버스에 그린다. 화면용과 내보내기용 모두 여기를 쓴다. */
 
-import { OPEN } from './pattern.js';
+import { OPEN, clamp } from './pattern.js';
 
 export const GUIDE_EVERY = 10;
-
-function clamp(n, lo, hi) {
-  return Math.min(hi, Math.max(lo, n));
-}
 
 /**
  * 번호 여백(눈금자) 두께.
