@@ -1,4 +1,5 @@
 import { Pattern, OPEN, FILLED, MAX_SIDE } from './pattern.js';
+import { loadImageFile, toPattern, DEFAULT_OPTIONS } from './image.js';
 import { draw, hitTest, canvasSize } from './renderer.js';
 import { buildReading, readingToHTML } from './reading.js';
 import { History } from './history.js';
@@ -29,6 +30,8 @@ const state = {
   cell: 18,
   view: { guides: true, numbers: true, symbols: false, boustrophedon: true },
   tab: 'pattern',
+  // 이미지 탭. source는 세션 동안만 살아 있고 저장하지 않는다.
+  image: { source: null, options: { ...DEFAULT_OPTIONS } },
   // 진행 중인 스트로크
   stroke: null,
   dirty: false,
@@ -82,6 +85,13 @@ function syncControlsFromState() {
     $(`tab-${name}`).setAttribute('aria-selected', String(selected));
     $(`panel-${name}`).hidden = !selected;
   }
+
+  const img = state.image.options;
+  $('in-threshold').value = img.threshold;
+  $('out-threshold').textContent = img.threshold;
+  $('opt-img-invert').checked = img.invert;
+  $('opt-img-dither').checked = img.dither;
+  $('opt-img-contain').checked = img.contain;
 }
 
 // ---------------------------------------------------------------- 렌더링
@@ -473,6 +483,7 @@ function redo() {
 
 function bindPanel() {
   bindTabs();
+  bindImageTab();
   $('btn-resize').addEventListener('click', applyResize);
   for (const id of ['in-cols', 'in-rows']) {
     $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') applyResize(); });
@@ -576,6 +587,14 @@ function applyResize() {
   state.cell = clamp(state.cell, MIN_CELL, maxCellForPattern());
   syncControlsFromState();
   commit();
+
+  // 불러온 이미지가 있으면 새 격자에 맞춰 미리보기를 다시 만든다.
+  // 도안 자체를 자동으로 덮어쓰지는 않는다 — 크기만 고치려던 사람의
+  // 손질을 말없이 지워버리게 된다. 새 미리보기를 보고 직접 적용하면 된다.
+  if (state.image.source) {
+    renderImagePreview();
+    if (state.tab === 'image') toast('새 크기로 다시 변환했습니다. [도안에 적용]을 누르세요.');
+  }
 }
 
 function losesFilledCells(p, cols, rows) {
@@ -631,6 +650,104 @@ function printPattern() {
   const img = $('print-img');
   if (img.complete) window.print();
   else img.onload = () => window.print();
+}
+
+// ---------------------------------------------------------------- 이미지 탭
+
+function bindImageTab() {
+  $('btn-image-load').addEventListener('click', () => $('file-image').click());
+
+  $('file-image').addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';                        // 같은 파일을 다시 고를 수 있게
+    if (!file) return;
+
+    $('image-name').textContent = '읽는 중…';
+    try {
+      const source = await loadImageFile(file);
+      state.image.source?.close();
+      state.image.source = source;
+      $('image-name').textContent = `${file.name} (${source.width}×${source.height})`;
+      $('image-controls').hidden = false;
+      renderImagePreview();
+    } catch (err) {
+      $('image-name').textContent = '불러오지 못했습니다.';
+      toast(err.message);
+    }
+  });
+
+  bindImageOption('opt-img-invert', 'invert');
+  bindImageOption('opt-img-dither', 'dither');
+  bindImageOption('opt-img-contain', 'contain');
+
+  // 슬라이더는 드래그 도중에도 계속 반영한다 — 기준값은 눈으로 맞추는 것이라
+  // 손을 뗄 때만 바뀌면 어디가 알맞은지 알 수 없다.
+  $('in-threshold').addEventListener('input', (e) => {
+    state.image.options.threshold = Number(e.target.value);
+    $('out-threshold').textContent = e.target.value;
+    renderImagePreview();
+  });
+
+  $('btn-image-apply').addEventListener('click', applyImage);
+  $('btn-image-clear').addEventListener('click', clearImage);
+}
+
+function bindImageOption(id, key) {
+  $(id).addEventListener('change', (e) => {
+    state.image.options[key] = e.target.checked;
+    renderImagePreview();
+  });
+}
+
+/** 지금 설정으로 변환한 도안. 미리보기와 적용이 같은 결과를 쓰게 한다. */
+function imageToPattern() {
+  const { source, options } = state.image;
+  return toPattern(source, state.pattern.cols, state.pattern.rows, options);
+}
+
+function renderImagePreview() {
+  if (!state.image.source) return;
+
+  const preview = imageToPattern();
+  const canvasEl = $('image-preview');
+
+  // 패널 폭에 맞추되 칸이 너무 잘게 쪼개지지 않을 만큼만 키운다
+  const cell = clamp(Math.floor(260 / Math.max(preview.cols, preview.rows)), 1, 8);
+  canvasEl.width = preview.cols * cell;
+  canvasEl.height = preview.rows * cell;
+
+  draw(canvasEl.getContext('2d'), preview, {
+    cell,
+    // 미리보기는 작아서 안내선·번호가 오히려 형태를 가린다
+    guides: false,
+    numbers: false,
+    symbols: false,
+    colors: {
+      bg: '#ffffff', line: '#ffffff', lineStrong: '#ffffff',
+      filled: '#1a1a1a', text: '#555555',
+    },
+  });
+
+  const filled = preview.countOf(FILLED);
+  const pct = Math.round((filled / preview.cells.length) * 100);
+  $('image-preview-info').textContent =
+    `${preview.cols} × ${preview.rows}칸 · 채움 ${filled}칸 (${pct}%)`;
+}
+
+function applyImage() {
+  if (!state.image.source) return;
+  state.pattern = imageToPattern();
+  commit();
+  toast('이미지를 도안에 적용했습니다. 되돌리려면 ↶');
+}
+
+function clearImage() {
+  if (!state.image.source) return;
+  state.image.source.close();
+  state.image.source = null;
+  $('image-controls').hidden = true;
+  $('image-name').textContent = '사진이나 그림을 고르면 도안으로 바꿔 줍니다.';
+  toast('불러온 이미지를 비웠습니다. (도안은 그대로입니다)');
 }
 
 // ---------------------------------------------------------------- 키보드

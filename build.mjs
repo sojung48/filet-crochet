@@ -16,7 +16,7 @@ import { dirname, join } from 'node:path';
 const root = dirname(fileURLToPath(import.meta.url));
 
 // 의존 순서대로. main은 나머지를 모두 쓰므로 마지막.
-const FILES = ['pattern.js', 'renderer.js', 'reading.js', 'history.js', 'storage.js', 'main.js'];
+const FILES = ['pattern.js', 'renderer.js', 'reading.js', 'history.js', 'storage.js', 'image.js', 'main.js'];
 
 const strip = (src) => src
   // import 문 제거 (같은 스코프에 합쳐지므로 불필요)

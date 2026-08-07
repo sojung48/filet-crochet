@@ -139,8 +139,47 @@
     <div class="tabpanel" role="tabpanel" id="panel-image" aria-labelledby="tab-image" hidden>
       <section class="panel-section">
         <h2>이미지에서 만들기</h2>
-        <p class="hint todo">준비 중입니다. (스텝 2)</p>
+        <div class="field-row">
+          <button type="button" id="btn-image-load" class="wide">이미지 불러오기</button>
+        </div>
+        <input type="file" id="file-image" accept="image/*" hidden>
+        <p class="hint" id="image-name">사진이나 그림을 고르면 도안으로 바꿔 줍니다.</p>
       </section>
+
+      <!-- 이미지를 고르기 전에는 조절할 것이 없으므로 통째로 숨긴다 -->
+      <div id="image-controls" hidden>
+        <section class="panel-section">
+          <h2>미리보기</h2>
+          <div class="preview-box">
+            <canvas id="image-preview" aria-label="변환 미리보기"></canvas>
+          </div>
+          <p class="hint" id="image-preview-info">–</p>
+        </section>
+
+        <section class="panel-section">
+          <h2>변환</h2>
+          <label class="slider-row">
+            <span>밝기 기준</span>
+            <input type="range" id="in-threshold" min="1" max="254" value="128">
+            <output id="out-threshold">128</output>
+          </label>
+          <p class="hint">왼쪽으로 갈수록 어두운 부분만 채웁니다.</p>
+          <label class="check"><input type="checkbox" id="opt-img-invert"> 밝고 어두움 뒤집기</label>
+          <label class="check"><input type="checkbox" id="opt-img-dither"> 점묘로 명암 표현</label>
+          <label class="check"><input type="checkbox" id="opt-img-contain" checked> 비율 유지</label>
+        </section>
+
+        <section class="panel-section">
+          <div class="field-row">
+            <button type="button" id="btn-image-apply">도안에 적용</button>
+            <button type="button" id="btn-image-clear" title="불러온 이미지 비우기">🗑 비우기</button>
+          </div>
+          <p class="hint">
+            적용해도 실행취소(↶)로 되돌릴 수 있습니다.
+            도안 크기를 바꾸면 원본에서 다시 변환합니다.
+          </p>
+        </section>
+      </div>
     </div>
 
     <div class="tabpanel" role="tabpanel" id="panel-text" aria-labelledby="tab-text" hidden>
@@ -165,6 +204,6 @@
 
 <!-- 번들(일반 스크립트)이라 index.html을 그냥 더블클릭해도 동작한다.
      원본은 js/*.js 이고, 수정 후에는 "node build.mjs"로 다시 만든다. -->
-<script defer src="js/bundle.js?v=2418747d"></script>
+<script defer src="js/bundle.js?v=36785b30"></script>
 </body>
 </html>
