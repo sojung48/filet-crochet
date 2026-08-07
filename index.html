@@ -83,6 +83,19 @@
   </main>
 
   <aside class="panel" id="panel">
+
+    <!-- 패널을 세로로 계속 쌓으면 폰에서 스크롤이 너무 길어진다.
+         '도안'은 지금까지 쓰던 편집 설정, 나머지 둘은 도안을 만드는 통로. -->
+    <div class="tabs" role="tablist" aria-label="패널">
+      <button type="button" class="tab" role="tab" id="tab-pattern"
+              aria-controls="panel-pattern" aria-selected="true">도안</button>
+      <button type="button" class="tab" role="tab" id="tab-image"
+              aria-controls="panel-image" aria-selected="false">이미지</button>
+      <button type="button" class="tab" role="tab" id="tab-text"
+              aria-controls="panel-text" aria-selected="false">텍스트</button>
+    </div>
+
+    <div class="tabpanel" role="tabpanel" id="panel-pattern" aria-labelledby="tab-pattern">
     <section class="panel-section">
       <h2>격자 크기</h2>
       <div class="field-row">
@@ -121,6 +134,21 @@
         <button type="button" id="btn-print">인쇄</button>
       </div>
     </section>
+    </div><!-- /panel-pattern -->
+
+    <div class="tabpanel" role="tabpanel" id="panel-image" aria-labelledby="tab-image" hidden>
+      <section class="panel-section">
+        <h2>이미지에서 만들기</h2>
+        <p class="hint todo">준비 중입니다. (스텝 2)</p>
+      </section>
+    </div>
+
+    <div class="tabpanel" role="tabpanel" id="panel-text" aria-labelledby="tab-text" hidden>
+      <section class="panel-section">
+        <h2>텍스트에서 만들기</h2>
+        <p class="hint todo">준비 중입니다. (스텝 4)</p>
+      </section>
+    </div>
 
   </aside>
 
@@ -137,6 +165,6 @@
 
 <!-- 번들(일반 스크립트)이라 index.html을 그냥 더블클릭해도 동작한다.
      원본은 js/*.js 이고, 수정 후에는 "node build.mjs"로 다시 만든다. -->
-<script defer src="js/bundle.js?v=6b2ba98b"></script>
+<script defer src="js/bundle.js?v=2418747d"></script>
 </body>
 </html>

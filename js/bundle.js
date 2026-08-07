@@ -618,12 +618,16 @@ const MAX_CELL = 48;
  */
 const MAX_CANVAS_PX = 15000;
 
+/** 오른쪽 패널의 탭. 순서가 화면 순서다. */
+const TABS = ['pattern', 'image', 'text'];
+
 const state = {
   pattern: new Pattern(30, 30),
   history: null,
   tool: 'draw',
   cell: 18,
   view: { guides: true, numbers: true, symbols: false, boustrophedon: true },
+  tab: 'pattern',
   // 진행 중인 스트로크
   stroke: null,
   dirty: false,
@@ -640,6 +644,8 @@ function init() {
     Object.assign(state.view, savedView.view ?? {});
     if (Number.isFinite(savedView.cell)) state.cell = clamp(savedView.cell, MIN_CELL, MAX_CELL);
     if (savedView.tool) state.tool = savedView.tool;
+    // 저장된 이름이 지금 없는 탭일 수도 있다(탭 이름을 바꾼 뒤 옛 설정을 읽는 경우)
+    if (TABS.includes(savedView.tab)) state.tab = savedView.tab;
   }
 
   const saved = loadPattern();
@@ -669,6 +675,11 @@ function syncControlsFromState() {
   $('opt-symbols').checked = state.view.symbols;
   for (const btn of document.querySelectorAll('.tool')) {
     btn.setAttribute('aria-pressed', String(btn.dataset.tool === state.tool));
+  }
+  for (const name of TABS) {
+    const selected = name === state.tab;
+    $(`tab-${name}`).setAttribute('aria-selected', String(selected));
+    $(`panel-${name}`).hidden = !selected;
   }
 }
 
@@ -1060,6 +1071,7 @@ function redo() {
 // ---------------------------------------------------------------- 패널
 
 function bindPanel() {
+  bindTabs();
   $('btn-resize').addEventListener('click', applyResize);
   for (const id of ['in-cols', 'in-rows']) {
     $(id).addEventListener('keydown', (e) => { if (e.key === 'Enter') applyResize(); });
@@ -1108,6 +1120,31 @@ function bindPanel() {
     commit();
     toast('반전했습니다. 되돌리려면 ↶');
   });
+}
+
+function bindTabs() {
+  for (const name of TABS) {
+    $(`tab-${name}`).addEventListener('click', () => setTab(name));
+  }
+
+  // 좌우 방향키로 탭 이동 (탭에 초점이 있을 때만).
+  // 캔버스 쪽 방향키는 도안 전체 이동이므로 서로 겹치지 않는다.
+  $('panel').addEventListener('keydown', (e) => {
+    if (!e.target.classList?.contains('tab')) return;
+    const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const next = TABS[(TABS.indexOf(state.tab) + step + TABS.length) % TABS.length];
+    setTab(next);
+    $(`tab-${next}`).focus();
+  });
+}
+
+function setTab(name) {
+  if (!TABS.includes(name) || name === state.tab) return;
+  state.tab = name;
+  syncControlsFromState();
+  persistView();
 }
 
 function bindCheckbox(id, key) {
@@ -1235,7 +1272,7 @@ function bindKeyboard() {
 // ---------------------------------------------------------------- 잡다
 
 function persistView() {
-  saveView({ view: state.view, cell: state.cell, tool: state.tool });
+  saveView({ view: state.view, cell: state.cell, tool: state.tool, tab: state.tab });
 }
 
 function setSaveHint(iso) {

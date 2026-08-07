@@ -225,10 +225,41 @@ input[type="number"] {
   background: var(--surface);
   overscroll-behavior: contain;
 }
+/* 탭 머리는 스크롤을 따라 붙어 있어야 한다. 폰에서 아래로 내리다
+   탭이 화면 밖으로 사라지면 다른 탭으로 옮겨갈 방법이 없어진다. */
+.tabs {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.tab {
+  flex: 1;
+  border: none;
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  padding: 11px 4px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.tab:hover:not([aria-selected="true"]) { color: var(--ink); }
+.tab[aria-selected="true"] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 700;
+}
+/* 눌렀을 때 버튼이 내려앉는 기본 동작은 탭에서는 어색하다 */
+.tab:active { transform: none; }
+
 .panel-section {
   padding: 12px 14px;
   border-bottom: 1px solid var(--line);
 }
+/* 아직 안 만든 탭임을 눈에 띄게 — 고장난 것으로 오해하지 않게 */
+.todo { font-style: italic; }
 .panel-section h2 {
   margin: 0 0 8px;
   font-size: 12px;
