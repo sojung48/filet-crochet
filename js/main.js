@@ -2,7 +2,7 @@ import { Pattern, OPEN, FILLED, MAX_SIDE, clamp } from './pattern.js';
 import { loadImageFile, toPattern, DEFAULT_OPTIONS } from './image.js';
 import {
   measure as measureText, renderTextInto as renderText,
-  ensureFontLoaded, clearGlyphCache,
+  ensureFontLoaded, fontReady,
 } from './text.js';
 import { draw, hitTest, canvasSize } from './renderer.js';
 import { buildReading, readingToHTML } from './reading.js';
@@ -773,14 +773,15 @@ function bindTextTab() {
   }
   $('btn-text-apply').addEventListener('click', applyText);
 
-  // 글꼴이 준비되기 전에 찍으면 대체 글꼴로 그려져 결과가 어긋난다.
-  // 준비되면 그동안 잰 글리프를 버리고 다시 그린다.
+  // 글꼴을 미리 받아둔다. 준비되면 그동안 잰 글리프를 버리고 다시 그린다.
   ensureFontLoaded().then((ok) => {
-    clearGlyphCache();
-    if (!ok) toast('글꼴을 불러오지 못했습니다. 글자 모양이 다를 수 있습니다.');
-    if ($('in-text').value) renderTextPreview();
+    fontFailed = !ok;
+    renderTextPreview();
   });
 }
+
+/** 글꼴을 끝내 못 받았는지. 안내 문구를 바꾸는 데만 쓴다. */
+let fontFailed = false;
 
 /** 지금 입력과 설정으로 잰 크기. */
 function currentTextMeasure() {
@@ -800,6 +801,21 @@ function renderTextPreview() {
   if (!text.trim()) {
     canvasEl.width = canvasEl.height = 0;
     info.textContent = '글자를 입력하면 크기를 알려 드립니다.';
+    warn.hidden = true;
+    $('btn-text-apply').disabled = true;
+    return;
+  }
+
+  // 글꼴이 아직 안 왔으면 그리지 않는다.
+  //
+  // `font-display: block`은 글꼴을 기다리는 동안 글자를 투명하게 그린다.
+  // 그 상태로 찍으면 잉크가 하나도 없어 글자 폭이 0이 되고, 미리보기가
+  // 빈 화면이 된다 — 고장난 것처럼 보인다. 준비되면 다시 부른다.
+  if (!fontReady()) {
+    canvasEl.width = canvasEl.height = 0;
+    info.textContent = fontFailed
+      ? '글꼴을 불러오지 못했습니다. 새로고침해 보세요.'
+      : '글꼴을 불러오는 중입니다…';
     warn.hidden = true;
     $('btn-text-apply').disabled = true;
     return;

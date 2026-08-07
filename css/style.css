@@ -285,12 +285,20 @@ input[type="number"] {
   border: 1px solid var(--line);
   border-radius: 6px;
 }
-#image-preview {
+/* 이미지·텍스트 두 미리보기가 같은 규칙을 쓴다.
+   한쪽에만 걸어두면 나머지가 패널 밖으로 넘쳐 잘린다. */
+#image-preview,
+#text-preview {
   display: block;
   max-width: 100%;
   height: auto;
   /* 칸이 화면 픽셀보다 작아질 때 흐려지지 않게 — 격자는 또렷해야 읽힌다 */
   image-rendering: pixelated;
+}
+
+/* 빈 캔버스(글자 입력 전)는 테두리만 남아 고장난 것처럼 보인다 */
+.preview-box:has(canvas[width="0"]) {
+  display: none;
 }
 
 .slider-row {
