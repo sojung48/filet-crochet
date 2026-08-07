@@ -991,7 +991,7 @@ function rasterLine(line, letterSpacing) {
  * 세로는 글자 높이가 고정이라 줄 수로 곱하면 된다.
  *
  * @returns {{ cols, rows, lines, overflowX, overflowY }}
- */function measure(text, options) {
+ */function measureText(text, options) {
   const { letterSpacing, lineSpacing } = { ...TEXT_DEFAULTS, ...options };
   const lines = text.split('\n');
 
@@ -1023,10 +1023,10 @@ function rasterLine(line, letterSpacing) {
  * 미리 확인하고 크기를 맞춰 두는 것을 전제한다.
  *
  * @param {Pattern} into 찍어 넣을 도안 (그대로 바뀐다)
- */function renderTextInto(into, text, options) {
+ */function renderText(into, text, options) {
   const { letterSpacing, lineSpacing } = { ...TEXT_DEFAULTS, ...options };
   const lines = text.split('\n');
-  const size = measure(text, { letterSpacing, lineSpacing });
+  const size = measureText(text, { letterSpacing, lineSpacing });
 
   // 가운데 정렬. 처음부터 가운데 있는 편이 손이 덜 간다
   // (자리를 옮기고 싶으면 전체 이동 기능이 있다).
@@ -1049,7 +1049,7 @@ function rasterLine(line, letterSpacing) {
 
 /** 텍스트만으로 새 도안을 만든다. */function textToPattern(text, cols, rows, options) {
   const p = new Pattern(cols, rows);
-  renderTextInto(p, text, options);
+  renderText(p, text, options);
   return p;
 }
 

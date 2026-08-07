@@ -51,6 +51,30 @@ if (dupes.length) {
   process.exit(1);
 }
 
+// 이름 바꾼 import 검사.
+//
+// `import { a as b }`는 이 빌드에서 통하지 않는다. import 문을 통째로
+// 지우고 한 스코프에 합치므로, 원래 이름 a만 남고 b는 어디에도 없다.
+// 부르는 쪽은 b를 쓰고 있으니 실행할 때서야 ReferenceError가 난다
+// (실제로 measureText/renderText가 이래서 텍스트 탭이 통째로 죽었다).
+const aliased = [];
+FILES.forEach((f) => {
+  const src = readFileSync(join(root, 'js', f), 'utf8');
+  for (const m of src.matchAll(/import\s*\{([^}]*)\}\s*from/g)) {
+    for (const part of m[1].split(',')) {
+      const as = part.match(/(\S+)\s+as\s+(\S+)/);
+      if (as) aliased.push(`js/${f}:  ${as[1]} as ${as[2]}`);
+    }
+  }
+});
+if (aliased.length) {
+  console.error('오류: 이름을 바꾼 import는 이 빌드에서 동작하지 않습니다.');
+  console.error('      (import를 지우고 한 스코프로 합치므로 바뀐 이름은 사라집니다)');
+  for (const a of aliased) console.error('  ' + a);
+  console.error('  → 원본 파일에서 함수 이름 자체를 바꾸세요.');
+  process.exit(1);
+}
+
 const out = `/* 자동 생성 파일 — 편집하지 말 것. 원본은 js/*.js, 재생성은 "node build.mjs" */
 (function () {
 'use strict';
@@ -58,6 +82,28 @@ const out = `/* 자동 생성 파일 — 편집하지 말 것. 원본은 js/*.js
 ${parts.join('\n')}
 })();
 `;
+
+// 불러오려는 이름이 정말 있는지 검사.
+//
+// 합쳐진 뒤에는 import가 사라지므로, 없는 이름을 불러도 빌드는 조용히
+// 끝나고 실행할 때 ReferenceError가 난다. 화면 한 구석만 죽으면
+// 한참 뒤에야 알아챈다 — 여기서 잡는 편이 훨씬 싸다.
+const declared = new Set(seen.keys());
+const missing = [];
+FILES.forEach((f) => {
+  const src = readFileSync(join(root, 'js', f), 'utf8');
+  for (const m of src.matchAll(/import\s*\{([^}]*)\}\s*from/g)) {
+    for (const raw of m[1].split(',')) {
+      const name = raw.trim().split(/\s+as\s+/)[0].trim();
+      if (name && !declared.has(name)) missing.push(`js/${f}:  ${name}`);
+    }
+  }
+});
+if (missing.length) {
+  console.error('오류: 불러오려는 이름이 어디에도 선언되어 있지 않습니다.');
+  for (const m of missing) console.error('  ' + m);
+  process.exit(1);
+}
 
 writeFileSync(join(root, 'js', 'bundle.js'), out, 'utf8');
 

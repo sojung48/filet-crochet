@@ -1,8 +1,7 @@
 import { Pattern, OPEN, FILLED, MAX_SIDE, clamp } from './pattern.js';
 import { loadImageFile, toPattern, DEFAULT_OPTIONS } from './image.js';
 import {
-  measure as measureText, renderTextInto as renderText,
-  ensureFontLoaded, fontReady,
+  measureText, renderText, ensureFontLoaded, fontReady,
 } from './text.js';
 import { draw, hitTest, canvasSize } from './renderer.js';
 import { buildReading, readingToHTML } from './reading.js';

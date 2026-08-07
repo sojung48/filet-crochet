@@ -154,7 +154,7 @@ function rasterLine(line, letterSpacing) {
  *
  * @returns {{ cols, rows, lines, overflowX, overflowY }}
  */
-export function measure(text, options) {
+export function measureText(text, options) {
   const { letterSpacing, lineSpacing } = { ...TEXT_DEFAULTS, ...options };
   const lines = text.split('\n');
 
@@ -187,10 +187,10 @@ export function measure(text, options) {
  *
  * @param {Pattern} into 찍어 넣을 도안 (그대로 바뀐다)
  */
-export function renderTextInto(into, text, options) {
+export function renderText(into, text, options) {
   const { letterSpacing, lineSpacing } = { ...TEXT_DEFAULTS, ...options };
   const lines = text.split('\n');
-  const size = measure(text, { letterSpacing, lineSpacing });
+  const size = measureText(text, { letterSpacing, lineSpacing });
 
   // 가운데 정렬. 처음부터 가운데 있는 편이 손이 덜 간다
   // (자리를 옮기고 싶으면 전체 이동 기능이 있다).
@@ -214,7 +214,7 @@ export function renderTextInto(into, text, options) {
 /** 텍스트만으로 새 도안을 만든다. */
 export function textToPattern(text, cols, rows, options) {
   const p = new Pattern(cols, rows);
-  renderTextInto(p, text, options);
+  renderText(p, text, options);
   return p;
 }
 
